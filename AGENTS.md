@@ -22,15 +22,17 @@
    - [docs/CLINICAL_ENGINE.md](docs/CLINICAL_ENGINE.md) — математика ЭКГ, стадии, ИМбпST/Велленс/де Винтер, ЧКВ и локализатор.
    - [docs/3D_MODEL.md](docs/3D_MODEL.md) — анатомия `heart_optimized.glb`, координаты, ПКМ-панорамирование, подписи `ArteryLabel` и гайд для Houdini FX.
    - [docs/DESKTOP_BUILD.md](docs/DESKTOP_BUILD.md) — упаковка в автономный Windows Portable `.exe` на базе Electron.
-   - [docs/ARCHITECTURE_ROADMAP.md](docs/ARCHITECTURE_ROADMAP.md) — направление развития: общее ядро TypeScript, десктоп на Electron, отдельный мобильный интерфейс; Capacitor пока кандидат для прототипа.
+   - [docs/ANDROID_BUILD.md](docs/ANDROID_BUILD.md) — Android-оболочка Capacitor 8, сборка APK и проверка на устройстве.
+   - [docs/IOS_PWA.md](docs/IOS_PWA.md) — офлайн-PWA для iPhone (Service Worker `sw.js`, иконки, GitHub Pages).
+   - [docs/ARCHITECTURE_ROADMAP.md](docs/ARCHITECTURE_ROADMAP.md) — направление развития: общее ядро TypeScript, десктоп на Electron, мобильный интерфейс, Android Capacitor и офлайн-PWA для iOS.
 
 ---
 
 ## 2. Архитектура и поток данных
 
-Вся синхронизация сосредоточена в едином источнике истины — состоянии в `src/App.tsx`:
+Вся синхронизация сосредоточена в едином источнике истины: верхнеуровневая маршрутизация режимов (`Атлас` / `Тренировка`, синхронизация с `window.history` и ленивый `React.lazy`) находится в `src/App.tsx`, а состояние атласа сосредоточено в `src/components/AtlasView.tsx`.
 
-Это текущая реализация. Целевые границы модулей описаны в `docs/ARCHITECTURE_ROADMAP.md`: постепенно отделяем медицинские данные, генератор и учебную логику от React и платформенных адаптеров. Новые расчёты не должны зависеть от DOM/Electron; медицинские условия случая отделяем от координат 3D-маркеров. Мобильная версия ещё не реализована; технологию её упаковки подтвердит прототип на устройстве.
+Целевые границы модулей описаны в `docs/ARCHITECTURE_ROADMAP.md`: медицинские данные, генератор и учебная логика отделены от React и платформенных адаптеров (`src/core/` и `src/platform/`). Новые расчёты не должны зависеть от DOM/Electron/Capacitor; медицинские условия случая отделяются от координат 3D-маркеров. Прототипы для Android (Capacitor 8) и iPhone (офлайн-PWA) уже подготовлены и ожидают проверки на физических устройствах.
 
 ```text
   [Вкладки ИМпST / ИМбпST или выбор кейса / Клик на 3D-сосуде] ──┐
@@ -62,9 +64,9 @@
 
 | Задача | Какие файлы менять |
 | :--- | :--- |
-| Добавить новый сценарий ИМпST / ИМбпST / мимик | `src/core/types.ts` (`CaseId`), `src/core/content/coronaryCases.ts` (`CORONARY_CASES`, `CASE_ORDER`, привязки в `src/presentation/heartLandmarks.ts` и при необходимости `replacesBaseMarker`), `src/data/angiographyProjections.ts` (`CASE_OPTIMAL_PROJECTION`), `src/components/Heart3D.tsx` (`LCA_CASE_SET`, `isVertexDistalToOcclusion`), `src/App.tsx` (`STEMI_CASES`/`NSTEMI_CASES`/`CHIP_LABELS`), при необходимости `src/core/ecg/localizer.ts` |
+| Добавить новый сценарий ИМпST / ИМбпST / мимик | `src/core/types.ts` (`CaseId`), `src/core/content/coronaryCases.ts` (`CORONARY_CASES`, `CASE_ORDER`, привязки в `src/presentation/heartLandmarks.ts` и при необходимости `replacesBaseMarker`), `src/data/angiographyProjections.ts` (`CASE_OPTIMAL_PROJECTION`, `getOptimalProjectionForCase`), `src/components/Heart3D.tsx` (`LCA_CASE_SET`, `isVertexDistalToOcclusion`), `src/components/AtlasView.tsx` (`STEMI_CASES`/`NSTEMI_CASES`/`CHIP_LABELS`), при необходимости `src/core/ecg/localizer.ts` |
 | Настроить морфологию волн (de Winter, Wellens, Sgarbossa, Brugada) | `src/core/types.ts` (`StShape`, `LeadShiftProfile`), `src/core/ecg/ecgEngine.ts` (`sampleBeatMv`, `getLeadBadge`) |
-| Изменить стадии времени или эффект ЧКВ (TIMI 3) | `src/core/ecg/ecgEngine.ts` (`STAGE_PRESETS`, `NSTEMI_STAGE_SUMMARIES`, `NATURAL_KEYFRAMES`, `REPERFUSED_KEYFRAMES`, `computeStageModifiers`), `src/components/TimelineBar.tsx` |
+| Изменить стадии времени или эффект ЧКВ (TIMI 3) | `src/core/ecg/ecgEngine.ts` (`STAGE_PRESETS`, `NSTEMI_STAGE_SUMMARIES`, `DE_WINTER_STAGE_SUMMARIES`, `NATURAL_KEYFRAMES`, `REPERFUSED_KEYFRAMES`, `computeStageModifiers`), `src/components/TimelineBar.tsx` |
 | Добавить отведения / поменять сетку бумаги или калипер | `src/components/EcgPaper.tsx`, `src/core/ecg/ecgEngine.ts` (`NORMAL_LEAD_BASE`) |
 | Изменить 3D-проекции КАГ, ПКМ-панорамирование или подписи артерий | `src/data/angiographyProjections.ts`, `src/utils/cArmMath.ts`, `src/components/CArmDiagram.tsx`, `src/components/Heart3D.tsx` (`ArteryLabel`, `CameraRig`, `LabelMode`, `isVertexDistalToOcclusion`, `classifyMyocardiumVertex`) |
 | Заменить 3D-модель сердца (напр., `.glb` из Houdini) | `public/models/heart/`, `src/components/Heart3D.tsx` (см. `docs/3D_MODEL.md`) |
@@ -80,7 +82,7 @@
 
 ### B. Загрузка `heart_optimized.glb` и текстуры `heart_diffuse.webp` (`Heart3D.tsx`)
 - Модель в `public/models/heart/heart_optimized.glb` сконвертирована из оптимизированной сцены Houdini скриптом `scripts/convert_geo_to_glb.py` и загружается через `GLTFLoader` ровно один раз (`useEffect(..., [])` с полным `dispose()` в cleanup).
-- В качестве диффузной карты используется `/models/heart/heart_diffuse.webp` (`1024×1024` WebP, `colorSpace = THREE.SRGBColorSpace`). Поскольку UV-координаты в `.glb` записаны по стандарту glTF 2.0 (`v=0` вверху), **обязательно сохранять `diffuseTex.flipY = false`**.
+- В качестве диффузной карты используется `${import.meta.env.BASE_URL}models/heart/heart_diffuse.webp` (`1024×1024` WebP, `colorSpace = THREE.SRGBColorSpace`), а геометрия загружается из `${import.meta.env.BASE_URL}models/heart/heart_optimized.glb`. Поскольку UV-координаты в `.glb` записаны по стандарту glTF 2.0 (`v=0` вверху), **обязательно сохранять `diffuseTex.flipY = false`**.
 - **Никогда не прокидывайте изменяемые при вращении камеры пропсы/состояние (например, `liveAngles`) в `<HeartCanvasViewport>`** и сохраняйте стабильный `onLoaded` через `ref`, чтобы поворот С-дуги не перезапускал загрузку или ререндер Canvas.
 
 ### C. Локальные координаты `heart_optimized.glb` и `Box3`
@@ -98,7 +100,7 @@
 ### E. Разделение логики ручного и пресетного режимов
 - `localizeFromManualLeads()` возвращает `primaryCaseId: null` при недостаточной разметке; это **не** заключение о норме. В таком случае показываются ручные изменения ЭКГ, а анатомия и диагноз пресета скрыты. Числовой «уверенности» нет. Велленс A и де Винтер доступны как пресеты, но не распознаются автоматически по одному ST↑/ST↓/T↓ без ввода необходимой морфологии.
 - Рекомендованные доп. отведения в ручном режиме берутся из результата локализатора, в том числе при отсутствии гипотезы. Неотмеченные отведения — «не оценено». После изменений локализатора запускать `npm run test:clinical`.
-- Когда `manualMode === true`, в `App.tsx` итоговый профиль отведений строится как `{ ...resolvedCase.leads, ...buildManualFallbackLeads(manualStates) }`. Это гарантирует, что:
+- Когда `manualMode === true`, в `AtlasView.tsx` итоговый профиль отведений строится как `{ ...resolvedCase.leads, ...buildManualFallbackLeads(manualStates) }`. Это гарантирует, что:
   1. 12-канальная ЭКГ мгновенно отражает каждый клик пользователя (`ST↑` / `ST↓` / `T↓`), даже если он отметил нестандартную комбинацию.
   2. Одновременно остальные отведения заполняются контекстом наиболее вероятной ИСА из локализатора.
 
@@ -108,7 +110,7 @@
 - При добавлении сценариев ИМбпST на уже занятый участок сосуда (`wellens_a`, `wellens_b`, `de_winter`, `nstemi_antlat`, `nstemi_tinv`, `nstemi_inf`) обязательно задавайте `replacesBaseMarker` в `src/presentation/heartLandmarks.ts` (`OcclusionLandmark`), чтобы на 3D-сцене не рисовались две наложенные сферы.
 
 ### G. Сборка десктопного Windows `.exe` (`electron/main.cjs`)
-- `Heart3D.tsx` загружает ассеты по абсолютным путям (`/models/heart/...`), что не работает через `file://`. Поэтому главный процесс [`electron/main.cjs`](electron/main.cjs) регистрирует привилегированную схему `app://localhost/...` (`protocol.registerSchemesAsPrivileged` строго до `app.whenReady()`) и отдаёт файлы из `dist/` с явными MIME-типами и проверкой path traversal.
+- `Heart3D.tsx` и сборка Vite используют относительную базу `base: './'` (`import.meta.env.BASE_URL`), что работает при открытии `app://localhost/index.html` в Electron, а не через `file://`. Поэтому главный процесс [`electron/main.cjs`](electron/main.cjs) регистрирует привилегированную схему `app://localhost/...` (`protocol.registerSchemesAsPrivileged` строго до `app.whenReady()`) и отдаёт файлы из `dist/` с явными MIME-типами и проверкой path traversal.
 - После изменений в веб-части пересборка портативного `.exe` выполняется командой `npm run dist:win` (результат — `release/CardioAtlas-ECG-1.0.0-Portable.exe`). Подробнее см. [docs/DESKTOP_BUILD.md](docs/DESKTOP_BUILD.md).
 
 ---
@@ -140,8 +142,14 @@
 ### L. Android-оболочка
 - Конфигурация — `capacitor.config.json`, проект — `android/`, инструкция — `docs/ANDROID_BUILD.md`. `server.url` в локальной сборке запрещён: интерфейс и модель должны попадать в APK.
 - После изменений веб-части `npm run android:sync` обновляет ресурсы и сравнивает их с `dist`. Не редактировать копии `android/app/src/main/assets/public` вручную.
-- Определение платформы находится в `src/platform/runtime.ts`; мобильная оболочка начинает с тренировки. В ядро Capacitor не импортировать.
+- Определение платформы находится в `src/platform/runtime.ts`; мобильная оболочка (и установленная PWA) начинает с тренировки (`preferTrainingHome`). В ядро Capacitor не импортировать.
+- `MainActivity.java` обрабатывает системную кнопку/жест «Назад» через `OnBackPressedCallback` в связке с `window.history` в `App.tsx` и `TrainingPanel.tsx`.
 - Проверка ресурсов и Chromium не подтверждают работу APK. Сборка требует JDK 21 и SDK Platform 36; проверка телефона описана в инструкции.
+
+### M. Офлайн-PWA для iPhone и GitHub Pages
+- В `vite.config.ts` задана относительная база `base: './'` и плагин `cardioAtlasPwaPlugin()`, генерирующий `dist/sw.js` с хэшем контента и полным precache `dist/`. Не используйте абсолютные пути вида `/models/...` или `/icons/...` — только `./...` или `import.meta.env.BASE_URL`, иначе деплой на подпуть `/infarct_miocard_ecg/` сломается.
+- `registerPwaServiceWorker()` в `src/platform/pwa.ts` регистрирует `./sw.js` только в production при `https:` / `localhost` (пропуская Vite dev, Electron `app:` и `isNativeMobile`).
+- `viewport-fit=cover` в `index.html` требует сохранения `.safe-top`, `.safe-bottom` и `.safe-x` в `src/index.css` (это также затрагивает `SystemBars` на Android WebView >= 140). Подробнее см. [docs/IOS_PWA.md](docs/IOS_PWA.md).
 
 ## 5. Чек-лист перед завершением любой правки
 

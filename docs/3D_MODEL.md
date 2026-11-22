@@ -53,7 +53,8 @@
 - `lcx`: `CA_MiCorazon_0`, `vx > 1650`.
 - `posterior`: `CA_MiCorazon_0`, `vx > 400 && vz < 900 && vy < -2400`.
 - `rca_prox`: `CA_MiCorazon_0`, `vx < 1400 && vy < 900`.
-- `rca_dist`, `nstemi_inf`: `CA_MiCorazon_0`, `vx < 1350 && vy < -2500`.
+- `rca_dist`: `CA_MiCorazon_0`, `vx < 1350 && vy < -2500`.
+- `nstemi_inf`: при правом типе кровоснабжения — `CA_MiCorazon_0`, `vx < 1350 && vy < -2500`; при левом типе (`dominance === 'left'`) дистальное русло, 3D-маркер, стент, подпись и КАГ (`LCA` / `RAO Caudal`) переключаются на `LCx` (`CA_MiCorazon_0`, `vx > 1650`, маркер замещает `lcx`).
 
 ### Визуализация степени поражения кровотока (`lesionType`)
 Поле `CoronaryCase.lesionType` управляет цветами русла, видом маркера, скоростью/прозрачностью болюса в режиме **КАГ (С-дуга)** и интенсивностью тонирования миокарда:

@@ -6,12 +6,10 @@
 
 ## 1. Публикация на GitHub Pages
 
-В репозитории настроен workflow [deploy-pages.yml](../.github/workflows/deploy-pages.yml).
+В репозитории настроен workflow [deploy-pages.yml](../.github/workflows/deploy-pages.yml), а в настройках репозитория (**Settings → Pages → Source: GitHub Actions**) публикация уже подключена.
 
-1. Откройте репозиторий на GitHub → **Settings → Pages**.
-2. В разделе **Build and deployment** выберите **Source: GitHub Actions**.
-3. После следующего push в ветку `main` (или ручного запуска **Actions → Deploy PWA to GitHub Pages → Run workflow**) сайт будет опубликован по адресу:
-   `https://tuber84.github.io/infarct_miocard_ecg/`
+После каждого push в ветку `main` (или ручного запуска **Actions → Deploy PWA to GitHub Pages → Run workflow**) обновлённая сборка автоматически разворачивается по адресу:
+`https://tuber84.github.io/infarct_miocard_ecg/`
 
 Относительные пути (`base: './'`, `start_url: './'`, `import.meta.env.BASE_URL`) позволяют одинаково работать как на подпути GitHub Pages, так и в корне любого другого HTTPS-домена.
 
