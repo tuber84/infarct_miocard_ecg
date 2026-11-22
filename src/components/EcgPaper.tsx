@@ -202,15 +202,22 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
       pinchActiveRef.current = false;
       clearStageTransform();
     };
+    const preventSafariGesture = (event: Event) => {
+      event.preventDefault();
+    };
     viewport.addEventListener('touchstart', start, { passive: false });
     viewport.addEventListener('touchmove', move, { passive: false });
     viewport.addEventListener('touchend', end);
     viewport.addEventListener('touchcancel', cancel);
+    viewport.addEventListener('gesturestart', preventSafariGesture, { passive: false });
+    viewport.addEventListener('gesturechange', preventSafariGesture, { passive: false });
     return () => {
       viewport.removeEventListener('touchstart', start);
       viewport.removeEventListener('touchmove', move);
       viewport.removeEventListener('touchend', end);
       viewport.removeEventListener('touchcancel', cancel);
+      viewport.removeEventListener('gesturestart', preventSafariGesture);
+      viewport.removeEventListener('gesturechange', preventSafariGesture);
     };
   }, []);
 

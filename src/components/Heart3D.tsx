@@ -514,15 +514,16 @@ function HeartSceneContent({
     let cancelled = false;
     let loadedMeshMap: Record<string, THREE.Mesh> | null = null;
 
+    const assetBase = import.meta.env.BASE_URL;
     const texLoader = new THREE.TextureLoader();
-    const diffuseTex = texLoader.load('/models/heart/heart_diffuse.webp');
+    const diffuseTex = texLoader.load(`${assetBase}models/heart/heart_diffuse.webp`);
     diffuseTex.colorSpace = THREE.SRGBColorSpace;
     diffuseTex.flipY = false; // Обязательно для UV в стандарте glTF 2.0
     diffuseTex.needsUpdate = true;
 
     const loader = new GLTFLoader();
     loader.load(
-      '/models/heart/heart_optimized.glb',
+      `${assetBase}models/heart/heart_optimized.glb`,
       (gltf) => {
         const rootScene = gltf.scene;
         if (cancelled) {
