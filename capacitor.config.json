@@ -1,0 +1,19 @@
+{
+  "appId": "ru.cardioatlas.ecg",
+  "appName": "КардиоАтлас ЭКГ",
+  "webDir": "dist",
+  "server": {
+    "hostname": "localhost",
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "style": "LIGHT"
+    }
+  },
+  "android": {
+    "backgroundColor": "#f8fafc",
+    "allowMixedContent": false
+  }
+}

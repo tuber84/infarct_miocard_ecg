@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">КардиоАтлас ЭКГ</string>
+    <string name="title_activity_main">КардиоАтлас ЭКГ</string>
+    <string name="package_name">ru.cardioatlas.ecg</string>
+    <string name="custom_url_scheme">ru.cardioatlas.ecg</string>
+</resources>
