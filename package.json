@@ -11,6 +11,7 @@
     "test:training": "node --test scripts/test-training.cjs",
     "test:ecg": "node --test scripts/test-ecg.cjs",
     "test:clinical": "node --test scripts/test-clinical.cjs",
+    "test:heart": "node --test scripts/test-heart-model.cjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

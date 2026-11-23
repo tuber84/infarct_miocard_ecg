@@ -1,3 +1,5 @@
+import { ARTERY_SEGMENTS, affectedArterySegments, isLeftCoronarySegment, segmentContrastDistance, type ArterySegment } from '../presentation/segmentedHeart';
+import { HEART_SEGMENT_GEOMETRY } from '../presentation/heartSegmentGeometry';
 import { HEART_LANDMARKS } from '../presentation/heartLandmarks';
 import React, {
   Component,
@@ -40,7 +42,6 @@ import {
   CORONARY_CASES,
   resolveCaseForDominance,
 } from '../core/content/coronaryCases';
-import { computeStageModifiers } from '../core/ecg/ecgEngine';
 import { CaseId, Dominance } from '../core/types';
 import {
   CArmAngles,
@@ -62,7 +63,7 @@ interface Heart3DProps {
 type ViewMode = 'anatomy' | 'angio';
 type LabelMode = 'active' | 'off' | 'all';
 
-const INITIAL_CAMERA_POS = cArmAnglesToPosition(0, 0, 4.4);
+const INITIAL_CAMERA_POS = cArmAnglesToPosition(0, 0, 5.2);
 const ZERO_VEC = new THREE.Vector3(0, 0, 0);
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
 const MAX_PAN_RADIUS = 2.1;
@@ -71,181 +72,12 @@ const BADGE_SCALE_STYLE: React.CSSProperties = {
   willChange: 'transform',
 };
 
-const VEIN_NAMES = ['AI_MiCorazon_0', 'CS_MiCorazon_0', 'MCV_MiCorazon_0', 'SCV_MiCorazon_0'];
-const ARTERY_NAMES = ['LCA_MiCorazon_0', 'CA_MiCorazon_0'];
-const MYOCARDIUM_NAMES = ['HS_1_MiCorazon_0', 'HS_2_Difumina_0'];
-const INNER_CHAMBER_NAMES = [
-  'LV_MiCorazon_0',
-  'RV_MiCorazon_0',
-  'AV_MiCorazon_0',
-  'MV_MiCorazon_0',
-  'PV_MiCorazon_0',
-  'TC_MiCorazon_0',
-  'PM_MiCorazon_0',
-];
-
-// Локальный центр ЛЖ и длинная ось «основание -> верхушка» в координатах геометрии FBX
-const LV_CENTER = new THREE.Vector3(1971, -1981, 329);
-const LV_APEX_AXIS = new THREE.Vector3(0.2, -0.78, 0.59).normalize();
-const LV_ANTERIOR_REF = new THREE.Vector3(0.18, 0.56, 0.81).normalize();
-const LV_SIDE_REF = new THREE.Vector3().crossVectors(LV_APEX_AXIS, LV_ANTERIOR_REF).normalize();
-
-// Устья коронарных артерий в сырых локальных координатах FBX для расчёта волны контраста
-const LMCA_OSTIUM = new THREE.Vector3(1438, 1902, -140);
-const LCX_PROX_REF = new THREE.Vector3(2955, 816, 698);
-const RCA_OSTIUM = new THREE.Vector3(-1800, 1750, 1000);
-
-const LCA_CASE_SET = new Set<CaseId>([
-  'lmca',
-  'lad_prox',
-  'lad_mid',
-  'lad_wrap',
-  'd1',
-  'lcx',
-  'posterior',
-  'nstemi_antlat',
-  'nstemi_tinv',
-  'wellens_a',
-  'wellens_b',
-  'de_winter',
-]);
-
-/**
- * Определяет, относится ли вершина артериального меша к дистальному руслу выбранного поражения
- */
-function isVertexDistalToOcclusion(
-  meshName: string,
-  vx: number,
-  vy: number,
-  vz: number,
-  caseId: CaseId,
-  dominance: Dominance
-): boolean {
-  if (caseId === 'normal') return false;
-  const isLca = meshName === 'LCA_MiCorazon_0';
-  const isCa = meshName === 'CA_MiCorazon_0';
-
-  switch (caseId) {
-    case 'lmca':
-      return isLca || (isCa && vx > 1500);
-    case 'lad_prox':
-    case 'de_winter':
-    case 'wellens_a':
-    case 'wellens_b':
-      return isLca && vy < 750 && vz > 1400;
-    case 'lad_mid':
-    case 'nstemi_antlat':
-    case 'nstemi_tinv':
-      return isLca && vy < -1500 && vx < 3000;
-    case 'lad_wrap':
-      return isLca && vy < -3250;
-    case 'd1':
-      return isLca && vx > 2650 && vy < -300;
-    case 'lcx':
-      return isCa && vx > 1650;
-    case 'posterior':
-      return isCa && vx > 400 && vz < 900 && vy < -2400;
-    case 'rca_prox':
-      return isCa && vx < 1400 && vy < 900;
-    case 'nstemi_inf':
-      if (dominance === 'left') {
-        return isCa && vx > 1650;
-      }
-      return isCa && vx < 1350 && vy < -2500;
-    case 'rca_dist':
-      return isCa && vx < 1350 && vy < -2500;
-    default:
-      return false;
-  }
-}
-
-/**
- * Вычисление нормированной дистанции [0..1] от устья для анимации болюса контраста
- */
-function computeNormalizedOstiumDist(
-  meshName: string,
-  vx: number,
-  vy: number,
-  vz: number
-): number {
-  if (meshName === 'LCA_MiCorazon_0') {
-    const d = Math.hypot(vx - LMCA_OSTIUM.x, vy - LMCA_OSTIUM.y, vz - LMCA_OSTIUM.z);
-    return Math.min(1, d / 8600);
-  }
-  if (meshName === 'CA_MiCorazon_0') {
-    if (vx > 1500) {
-      const d = Math.hypot(vx - LCX_PROX_REF.x, vy - LCX_PROX_REF.y, vz - LCX_PROX_REF.z);
-      return Math.min(1, 0.16 + d / 7200);
-    }
-    const d = Math.hypot(vx - RCA_OSTIUM.x, vy - RCA_OSTIUM.y, vz - RCA_OSTIUM.z);
-    return Math.min(1, d / 8400);
-  }
-  return 0;
-}
-
-/**
- * Однократная оценка принадлежности вершины миокарда (HS_1 / HS_2) к AHA-сегменту (1..17) или ПЖ
- */
-function classifyMyocardiumVertex(
-  vx: number,
-  vy: number,
-  vz: number
-): { aha: number; isRv: boolean } {
-  if (vx < 250 && vz > 750 && vy < 1200 && vy > -5900) {
-    return { aha: 0, isRv: true };
-  }
-
-  const relX = vx - LV_CENTER.x;
-  const relY = vy - LV_CENTER.y;
-  const relZ = vz - LV_CENTER.z;
-
-  const longProj =
-    relX * LV_APEX_AXIS.x + relY * LV_APEX_AXIS.y + relZ * LV_APEX_AXIS.z;
-  const normLong = (longProj + 3400) / 7600;
-
-  if (normLong < -0.08 || normLong > 1.15) {
-    return { aha: 0, isRv: false };
-  }
-
-  const antProj =
-    relX * LV_ANTERIOR_REF.x + relY * LV_ANTERIOR_REF.y + relZ * LV_ANTERIOR_REF.z;
-  const sideProj =
-    relX * LV_SIDE_REF.x + relY * LV_SIDE_REF.y + relZ * LV_SIDE_REF.z;
-
-  let angleDeg = (Math.atan2(sideProj, antProj) * 180) / Math.PI;
-  if (angleDeg < 0) angleDeg += 360;
-
-  if (normLong > 0.85) {
-    return { aha: 17, isRv: false };
-  }
-
-  if (normLong > 0.6) {
-    if (angleDeg >= 315 || angleDeg < 45) return { aha: 13, isRv: false };
-    if (angleDeg >= 45 && angleDeg < 135) return { aha: 16, isRv: false };
-    if (angleDeg >= 135 && angleDeg < 225) return { aha: 15, isRv: false };
-    return { aha: 14, isRv: false };
-  }
-
-  const isMid = normLong >= 0.28;
-  const offset = isMid ? 6 : 0;
-
-  if (angleDeg >= 330 || angleDeg < 30) return { aha: 1 + offset, isRv: false };
-  if (angleDeg >= 30 && angleDeg < 90) return { aha: 6 + offset, isRv: false };
-  if (angleDeg >= 90 && angleDeg < 150) return { aha: 5 + offset, isRv: false };
-  if (angleDeg >= 150 && angleDeg < 210) return { aha: 4 + offset, isRv: false };
-  if (angleDeg >= 210 && angleDeg < 270) return { aha: 3 + offset, isRv: false };
-  return { aha: 2 + offset, isRv: false };
-}
+const ARTERY_NAMES: readonly string[] = ARTERY_SEGMENTS;
 
 interface LandmarkWorldPos {
   caseId: CaseId;
   worldPos: THREE.Vector3;
   quaternion: THREE.Quaternion;
-}
-
-interface MyocardiumVertexCache {
-  ahaIds: Uint8Array;
-  isRvFlags: Uint8Array;
 }
 
 class CanvasErrorBoundary extends Component<
@@ -474,7 +306,6 @@ interface HeartSceneProps extends Heart3DProps {
   showDistalGhost: boolean;
   bolusNonce: number;
   labelMode: LabelMode;
-  showVeins: boolean;
   onLoaded: () => void;
 }
 
@@ -489,7 +320,6 @@ function HeartSceneContent({
   showDistalGhost,
   bolusNonce,
   labelMode,
-  showVeins,
   onLoaded,
 }: HeartSceneProps) {
   const [modelGroup, setModelGroup] = useState<THREE.Group | null>(null);
@@ -500,36 +330,32 @@ function HeartSceneContent({
   const meshMapRef = useRef<Record<string, THREE.Mesh>>({});
   const arteryDistRef = useRef<Record<string, Float32Array>>({});
   const arteryInLcaRef = useRef<Record<string, Uint8Array>>({});
-  const myoCacheRef = useRef<Record<string, MyocardiumVertexCache>>({});
 
-  // Стабилизируем колбэк, чтобы загрузка FBX никогда не перезапускалась при ререндерах
+  // Стабилизируем колбэк, чтобы загрузка GLB никогда не перезапускалась при ререндерах
   const onLoadedRef = useRef(onLoaded);
   onLoadedRef.current = onLoaded;
 
   const bolusProgressRef = useRef<number>(1.2);
   const bolusAnimatingRef = useRef<boolean>(false);
 
-  // Загрузка оптимизированного GLB и WebP-текстуры строго 1 раз + полный dispose при размонтировании
+  // Загрузка сегментированного GLB с цветами вершин строго 1 раз + полный dispose при размонтировании
   useEffect(() => {
     let cancelled = false;
     let loadedMeshMap: Record<string, THREE.Mesh> | null = null;
 
     const assetBase = import.meta.env.BASE_URL;
-    const texLoader = new THREE.TextureLoader();
-    const diffuseTex = texLoader.load(`${assetBase}models/heart/heart_diffuse.webp`);
-    diffuseTex.colorSpace = THREE.SRGBColorSpace;
-    diffuseTex.flipY = false; // Обязательно для UV в стандарте glTF 2.0
-    diffuseTex.needsUpdate = true;
-
     const loader = new GLTFLoader();
     loader.load(
-      `${assetBase}models/heart/heart_optimized.glb`,
+      `${assetBase}models/heart/heart_segmented.glb`,
       (gltf) => {
         const rootScene = gltf.scene;
         if (cancelled) {
           rootScene.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
-              (child as THREE.Mesh).geometry.dispose();
+              const mesh = child as THREE.Mesh;
+              mesh.geometry.dispose();
+              const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              materials.forEach(material => material.dispose());
             }
           });
           return;
@@ -538,7 +364,6 @@ function HeartSceneContent({
         const meshMap: Record<string, THREE.Mesh> = {};
         const distMap: Record<string, Float32Array> = {};
         const inLcaMap: Record<string, Uint8Array> = {};
-        const myoCacheMap: Record<string, MyocardiumVertexCache> = {};
 
         rootScene.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
@@ -548,10 +373,10 @@ function HeartSceneContent({
             meshMap[meshName] = mesh;
 
             const isArtery = ARTERY_NAMES.includes(meshName);
-            const isMyo = MYOCARDIUM_NAMES.includes(meshName);
-            const isVein = VEIN_NAMES.includes(meshName);
-            const isInner = INNER_CHAMBER_NAMES.includes(meshName);
 
+            mesh.userData.baseColors = new Float32Array(mesh.geometry.attributes.color.array);
+            const importedMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            importedMaterials.forEach(material => material.dispose());
             let anatMat: THREE.Material;
             let angioMat: THREE.Material;
 
@@ -574,78 +399,20 @@ function HeartSceneContent({
 
               const dists = new Float32Array(posAttr.count);
               const inLcaFlags = new Uint8Array(posAttr.count);
-              const isLcaMesh = meshName === 'LCA_MiCorazon_0';
+              const isLcaMesh = isLeftCoronarySegment(meshName);
 
               for (let i = 0; i < posAttr.count; i++) {
                 const vx = posAttr.getX(i);
                 const vy = posAttr.getY(i);
                 const vz = posAttr.getZ(i);
-                dists[i] = computeNormalizedOstiumDist(meshName, vx, vy, vz);
-                inLcaFlags[i] = isLcaMesh || vx > 1500 ? 1 : 0;
+                dists[i] = segmentContrastDistance(meshName as ArterySegment, vx, vy, vz, 'right');
+                inLcaFlags[i] = isLcaMesh ? 1 : 0;
               }
               distMap[meshName] = dists;
               inLcaMap[meshName] = inLcaFlags;
-            } else if (isMyo) {
-              anatMat = new THREE.MeshStandardMaterial({
-                map: diffuseTex,
-                vertexColors: true,
-                roughness: 0.52,
-                metalness: 0.04,
-                transparent: false,
-                opacity: 1,
-              });
-              angioMat = new THREE.MeshBasicMaterial({
-                color: new THREE.Color('#5a6573'),
-                transparent: true,
-                opacity: 0.13,
-                depthWrite: false,
-              });
-
-              const posAttr = mesh.geometry.attributes.position;
-              const colors = new Float32Array(posAttr.count * 3).fill(1);
-              mesh.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-              // Однократный предрасчёт AHA-сегментов и принадлежности к ПЖ
-              const ahaIds = new Uint8Array(posAttr.count);
-              const isRvFlags = new Uint8Array(posAttr.count);
-              for (let i = 0; i < posAttr.count; i++) {
-                const { aha, isRv } = classifyMyocardiumVertex(
-                  posAttr.getX(i),
-                  posAttr.getY(i),
-                  posAttr.getZ(i)
-                );
-                ahaIds[i] = aha;
-                isRvFlags[i] = isRv ? 1 : 0;
-              }
-              myoCacheMap[meshName] = { ahaIds, isRvFlags };
-            } else if (isVein) {
-              anatMat = new THREE.MeshStandardMaterial({
-                color: new THREE.Color('#3b5ca8'),
-                roughness: 0.45,
-                metalness: 0.05,
-                transparent: true,
-                opacity: 0.72,
-              });
-              angioMat = new THREE.MeshBasicMaterial({
-                color: new THREE.Color('#64748b'),
-                transparent: true,
-                opacity: 0.12,
-                depthWrite: false,
-              });
             } else {
-              anatMat = new THREE.MeshStandardMaterial({
-                map: diffuseTex,
-                roughness: 0.55,
-                metalness: 0.04,
-                transparent: false,
-                opacity: 1,
-              });
-              angioMat = new THREE.MeshBasicMaterial({
-                color: new THREE.Color('#64748b'),
-                transparent: true,
-                opacity: isInner ? 0.05 : 0.11,
-                depthWrite: false,
-              });
+              anatMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0 });
+              angioMat = new THREE.MeshBasicMaterial({ color: '#64748b', transparent: true, opacity: 0.11, depthWrite: false });
             }
 
             mesh.userData.anatMat = anatMat;
@@ -704,7 +471,7 @@ function HeartSceneContent({
           );
           const worldPos = targetMesh.localToWorld(localPt.clone());
 
-          const neighborLocal = new THREE.Vector3(tx, ty - 250, tz);
+          const neighborLocal = localPt.clone().add(new THREE.Vector3(...HEART_SEGMENT_GEOMETRY[landmark.mesh].tangent).multiplyScalar(0.01));
           const neighborWorld = targetMesh.localToWorld(neighborLocal);
           const tangent = neighborWorld.sub(worldPos).normalize();
           if (tangent.lengthSq() < 0.01) tangent.set(0, -1, 0);
@@ -722,7 +489,7 @@ function HeartSceneContent({
         meshMapRef.current = meshMap;
         arteryDistRef.current = distMap;
         arteryInLcaRef.current = inLcaMap;
-        myoCacheRef.current = myoCacheMap;
+
         setLandmarks(computedLandmarks);
         setModelGroup(wrapper);
         onLoadedRef.current();
@@ -735,7 +502,7 @@ function HeartSceneContent({
 
     return () => {
       cancelled = true;
-      diffuseTex.dispose();
+
       if (loadedMeshMap) {
         Object.values(loadedMeshMap).forEach((mesh) => {
           mesh.geometry.dispose();
@@ -766,19 +533,12 @@ function HeartSceneContent({
         mesh.renderOrder = viewMode === 'angio' ? 1 : 0;
       }
 
-      if (VEIN_NAMES.includes(name)) {
-        mesh.visible = viewMode === 'anatomy' && showVeins;
-      }
     });
-  }, [modelGroup, viewMode, showVeins]);
+  }, [modelGroup, viewMode]);
 
   const resolved = useMemo(
     () => resolveCaseForDominance(activeCaseId, dominance),
     [activeCaseId, dominance]
-  );
-  const stageMods = useMemo(
-    () => computeStageModifiers(timeline, reperfused),
-    [timeline, reperfused]
   );
   const lesionType = resolved.caseData.lesionType;
 
@@ -788,32 +548,23 @@ function HeartSceneContent({
       const meshes = meshMapRef.current;
       const distMap = arteryDistRef.current;
       const inLcaMap = arteryInLcaRef.current;
+      const affected = affectedArterySegments(activeCaseId, dominance);
 
       for (const artName of ARTERY_NAMES) {
         const mesh = meshes[artName];
         if (!mesh) continue;
-        const posAttr = mesh.geometry.attributes.position;
         const colAttr = mesh.geometry.attributes.color as THREE.BufferAttribute;
+        const posAttr = mesh.geometry.attributes.position;
         const dists = distMap[artName];
         const inLcaFlags = inLcaMap[artName];
 
         for (let i = 0; i < posAttr.count; i++) {
-          const vx = posAttr.getX(i);
-          const vy = posAttr.getY(i);
-          const vz = posAttr.getZ(i);
 
-          const distal = isVertexDistalToOcclusion(
-            artName,
-            vx,
-            vy,
-            vz,
-            activeCaseId,
-            dominance
-          );
-
+          const distal = affected.includes(artName as ArterySegment);
           if (viewMode === 'anatomy') {
             if (!distal) {
-              colAttr.setXYZW(i, 0.88, 0.14, 0.14, 1);
+              const base = mesh.userData.baseColors as Float32Array;
+              colAttr.setXYZW(i, base[i * 3], base[i * 3 + 1], base[i * 3 + 2], 1);
             } else if (reperfused) {
               colAttr.setXYZW(i, 0.96, 0.28, 0.22, 1);
             } else if (lesionType === 'subocclusion') {
@@ -821,10 +572,10 @@ function HeartSceneContent({
             } else if (lesionType === 'stenosis') {
               colAttr.setXYZW(i, 0.74, 0.22, 0.2, 1);
             } else {
-              colAttr.setXYZW(i, 0.2, 0.19, 0.44, 1);
+              colAttr.setXYZW(i, 0.32, 0.32, 0.32, 1);
             }
           } else {
-            const inLca = inLcaFlags ? inLcaFlags[i] === 1 : true;
+            const inLca = (artName === 'PDA' || artName === 'PLB') ? dominance === 'left' : inLcaFlags[i] === 1;
             const selectedSystem =
               angioSystem === 'BOTH' ||
               (angioSystem === 'LCA' && inLca) ||
@@ -879,99 +630,22 @@ function HeartSceneContent({
     bolusAnimatingRef.current = true;
   }, [bolusNonce]);
 
-  // Перекраска артерий и миокарда (миокард использует предрасчитанные Uint8Array без тригонометрии!)
+  // Пересчёт цветов вне кадра; в useFrame допускается только короткая анимация болюса.
   useEffect(() => {
     if (!modelGroup) return;
 
+    for (const artName of ARTERY_NAMES) {
+      const p = meshMapRef.current[artName]?.geometry.attributes.position;
+      if (!p) continue;
+      const distances = arteryDistRef.current[artName];
+      for (let i = 0; i < p.count; i++) distances[i] = segmentContrastDistance(artName as ArterySegment, p.getX(i), p.getY(i), p.getZ(i), dominance);
+    }
     applyArteryColors(bolusAnimatingRef.current ? bolusProgressRef.current : 1.2);
 
-    if (viewMode === 'anatomy') {
-      const meshes = meshMapRef.current;
-      const myoCache = myoCacheRef.current;
-      const activeSet = new Set(resolved.ahaSegments);
-      let tr = 1;
-      let tg = 1;
-      let tb = 1;
-
-      if (activeCaseId !== 'normal') {
-        if (reperfused && timeline >= 0.32) {
-          tr = 1.0;
-          tg = 0.65;
-          tb = 0.55;
-        } else if (lesionType === 'subocclusion' || lesionType === 'stenosis') {
-          // Мягкий янтарно-оранжевый оттенок субэндокардиальной ишемии без трансмурального серого рубца
-          if (timeline < 0.55) {
-            tr = 1.15;
-            tg = 0.54;
-            tb = 0.24;
-          } else {
-            tr = 1.04;
-            tg = 0.68;
-            tb = 0.46;
-          }
-        } else if (timeline < 0.22) {
-          tr = 1.18;
-          tg = 0.45;
-          tb = 0.22;
-        } else if (timeline < 0.5) {
-          tr = 1.15;
-          tg = 0.28;
-          tb = 0.22;
-        } else if (timeline < 0.78) {
-          tr = 0.68;
-          tg = 0.22;
-          tb = 0.28;
-        } else {
-          tr = 0.88;
-          tg = 0.86;
-          tb = 0.92;
-        }
-      }
-
-      const tintIntensity =
-        activeCaseId === 'normal'
-          ? 0
-          : activeCaseId === 'lmca'
-            ? 0.42
-            : reperfused && timeline >= 0.32
-              ? 0.35
-              : lesionType === 'subocclusion'
-                ? 0.45
-                : lesionType === 'stenosis'
-                  ? 0.32
-                  : 0.72;
-
-      const injR = 1 + (tr - 1) * tintIntensity;
-      const injG = 1 + (tg - 1) * tintIntensity;
-      const injB = 1 + (tb - 1) * tintIntensity;
-
-      for (const myoName of MYOCARDIUM_NAMES) {
-        const mesh = meshes[myoName];
-        const cache = myoCache[myoName];
-        if (!mesh || !cache) continue;
-        const colAttr = mesh.geometry.attributes.color as THREE.BufferAttribute;
-        const { ahaIds, isRvFlags } = cache;
-
-        for (let i = 0; i < ahaIds.length; i++) {
-          const aha = ahaIds[i];
-          const isRv = isRvFlags[i] === 1;
-          const isInjured =
-            (aha > 0 && activeSet.has(aha)) || (isRv && resolved.rvInvolved);
-
-          if (isInjured && tintIntensity > 0) {
-            colAttr.setXYZ(i, injR, injG, injB);
-          } else {
-            colAttr.setXYZ(i, 1, 1, 1);
-          }
-        }
-        colAttr.needsUpdate = true;
-      }
-    }
   }, [
     modelGroup,
     activeCaseId,
     resolved,
-    stageMods,
     timeline,
     reperfused,
     viewMode,
@@ -1026,7 +700,8 @@ function HeartSceneContent({
         if (replacedBaseMarkerId && lm.caseId === replacedBaseMarkerId && !isActive) return null;
 
         const isLmcaOrLad =
-          LCA_CASE_SET.has(lm.caseId) ||
+          isLeftCoronarySegment(HEART_LANDMARKS[lm.caseId]!.mesh) ||
+          (lm.caseId === 'posterior' && dominance === 'left') ||
           (lm.caseId === 'nstemi_inf' && dominance === 'left');
         const visibleInAngio =
           angioSystem === 'BOTH' ||
@@ -1277,7 +952,6 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
       prev === 'active' ? 'off' : prev === 'off' ? 'all' : 'active'
     );
   }, []);
-  const [showVeins, setShowVeins] = useState(true);
   const [showCArmHud, setShowCArmHud] = useState(true);
   const [showGuideCard, setShowGuideCard] = useState(false);
   const [showCompareTable, setShowCompareTable] = useState(false);
@@ -1384,7 +1058,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
     : PROJECTION_COMPARE_TABLES.lca_caudal;
 
   return (
-    <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
       {/* Шапка 3D-окна */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -1478,19 +1152,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                 Контур дист.
               </button>
             </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowVeins((v) => !v)}
-              className={`rounded-md border px-2 py-0.5 font-medium transition ${
-                showVeins
-                  ? 'border-blue-300 bg-blue-50 text-blue-700'
-                  : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              Вены
-            </button>
-          )}
+          ) : null}
 
           <button
             type="button"
@@ -1538,11 +1200,12 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
         </div>
       </div>
 
+      <p className="px-3 py-2 text-xs text-slate-500">3D показывает поражённые сосуды; зоны миокарда — на схеме AHA.{props.dominance === 'left' ? ' Левый тип показан условно: форма сосудов фиксирована.' : ''}</p>
       {/* 3D Canvas + Флюороскопический HUD */}
       <div
         ref={canvasContainerRef}
         onContextMenu={(e) => e.preventDefault()}
-        className={`relative min-h-[340px] flex-1 overflow-hidden ${
+        className={`relative h-[360px] flex-none overflow-hidden sm:h-[460px] ${
           viewMode === 'angio'
             ? 'bg-[#d2dae2]'
             : 'bg-gradient-to-b from-slate-100 via-slate-50 to-slate-200'
@@ -1622,7 +1285,6 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
           showDistalGhost={showDistalGhost}
           bolusNonce={bolusNonce}
           labelMode={labelMode}
-          showVeins={showVeins}
           onLoaded={handleLoaded}
           targetAngles={targetAngles}
           commandNonce={commandNonce}
