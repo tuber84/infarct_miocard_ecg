@@ -47,6 +47,10 @@ app.whenReady().then(async () => {
       const text = () => document.body.innerText;
       await wait(3500);
       check(text().includes('Клинические рекомендации РФ, 2024'), 'Нет обозначения источника');
+      await click('ПМЖВ дист.');
+      check(text().includes('Дистальный сегмент ПМЖВ (LAD)'), 'Нет правильного названия дистального сегмента');
+      check(text().includes('ПМЖВ дист. (LAD)'), 'Нет подписи дистального сегмента на 3D-модели');
+      check(!text().includes('Длинная ПМЖВ'), 'Осталось прежнее название случая');
       for (const label of ['ПКА прокс.', 'ПМЖВ прокс.', 'ОВ / ВТК', 'Задний ИМ', 'ПМЖВ прокс.']) await click(label);
       await click('ОКСбпST / паттерны');
       for (const label of ['ИМбпST нижн.', 'Велленс A', 'Велленс B', 'де Винтер', 'Ствол ЛКА']) await click(label);

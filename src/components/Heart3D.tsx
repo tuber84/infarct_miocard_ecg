@@ -1,6 +1,7 @@
 import { ARTERY_SEGMENTS, affectedArterySegments, isLeftCoronarySegment, segmentContrastDistance, type ArterySegment } from '../presentation/segmentedHeart';
 import { HEART_SEGMENT_GEOMETRY } from '../presentation/heartSegmentGeometry';
 import { HEART_LANDMARKS } from '../presentation/heartLandmarks';
+import { ARTERY_LABELS } from '../presentation/arteryLabels';
 import React, {
   Component,
   Suspense,
@@ -694,7 +695,6 @@ function HeartSceneContent({
       {landmarks.map((lm) => {
         const isActive = lm.caseId === activeCaseId;
         const isHovered = lm.caseId === hoveredCase;
-        const caseInfo = CORONARY_CASES[lm.caseId];
         // Не дублируем маркеры, лежащие на том же участке сосуда, что и базовые STEMI-точки
         if (HEART_LANDMARKS[lm.caseId]?.replacesBaseMarker && !isActive) return null;
         if (replacedBaseMarkerId && lm.caseId === replacedBaseMarkerId && !isActive) return null;
@@ -844,7 +844,7 @@ function HeartSceneContent({
               (labelMode === 'active' && (isActive || isHovered))) && (
               <ArteryLabel
                 worldPos={effectiveWorldPos}
-                text={`${caseInfo.shortTitle.split('(')[0].trim()}${angioStatusSuffix}`}
+                text={`${ARTERY_LABELS[isActive && isLeftDominantNstemiInf ? 'LCx' : HEART_LANDMARKS[lm.caseId]!.mesh].shortRu}${angioStatusSuffix}`}
                 className={`whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold shadow-md transition-colors ${
                   isActive
                     ? reperfused

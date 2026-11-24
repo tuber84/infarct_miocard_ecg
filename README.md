@@ -108,7 +108,8 @@ ECG_education/
 ├── README.md                        # Обзор проекта и быстрый старт
 ├── capacitor.config.json            # Конфигурация Capacitor (Android)
 ├── docs/
-│   ├── 3D_MODEL.md                  # Устройство heart_optimized.glb, ПКМ-панорамирование, подписи, КАГ
+│   ├── 3D_MODEL.md                  # Сегментированная 3D-модель, ПКМ, подписи и КАГ
+│   ├── CORONARY_NOMENCLATURE.md     # Названия сосудов и границы сегментов SYNTAX
 │   ├── ANDROID_BUILD.md             # Сборка Android APK на базе Capacitor 8 (JDK 21 + SDK 36)
 │   ├── ARCHITECTURE_ROADMAP.md      # Общее ядро, десктоп, мобильный интерфейс и этапы развития
 │   ├── CLINICAL_ENGINE.md           # Математическая модель ЭКГ, стадии ИМпST/ИМбпST, локализатор
@@ -135,8 +136,9 @@ ECG_education/
 │   ├── icons/                       # Иконки iOS (apple-touch-icon.png) и PWA (192/512/maskable)
 │   ├── manifest.webmanifest         # PWA-манифест с относительными путями
 │   └── models/heart/
-│       ├── heart_optimized.glb      # Оптимизированная 3D-модель сердца (glTF 2.0, без лёгких)
-│       └── heart_diffuse.webp       # Сжатая диффузная текстура (1024×1024 WebP)
+│       ├── heart_segmented.glb      # Текущая сегментированная модель с окраской вершин
+│       ├── heart_optimized.glb      # Предыдущая модель
+│       └── heart_diffuse.webp       # Текстура предыдущей модели
 ├── ref/                             # Исходные референсы (видео и оригинал модели) — НЕ ИЗМЕНЯТЬ
 └── src/
     ├── App.tsx                      # Корневой маршрутизатор (Тренировка / ленивый AtlasView, история)

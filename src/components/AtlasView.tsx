@@ -55,8 +55,8 @@ const NSTEMI_CASES: CaseId[] = [
 const CHIP_LABELS: Partial<Record<CaseId, string>> = {
   lad_prox: 'ПМЖВ прокс.',
   lad_mid: 'ПМЖВ сред.',
-  lad_wrap: 'Длинная ПМЖВ',
-  d1: 'D1 (Флаг ЮАР)',
+  lad_wrap: 'ПМЖВ дист.',
+  d1: 'ДВ1 (D1)',
   rca_prox: 'ПКА прокс.',
   rca_dist: 'ПКА дист.',
   lcx: 'ОВ / ВТК',

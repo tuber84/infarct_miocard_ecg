@@ -10,6 +10,7 @@
 2. **Папка `ref/` неприкосновенна:** внутри `ref/` лежат исходные видеореференсы и оригинальный архив 3D-модели. **Не удаляйте, не перемещайте и не изменяйте файлы в `ref/`**. Рабочие копии 3D-ассетов лежат в `public/models/heart/`.
    - **Медицинская основа по выбору пользователя:** российские клинические рекомендации 2024 года по ИМпST и ОКСбпST из `ref/gudelines/` (публикации 2025 года). ACC/AHA пока служат сравнительным материалом в аудите. Не смешивать временные интервалы и критерии из разных документов. Ссылки, условия и критерии РФ для интерфейса находятся в `src/core/content/clinicalGuidelines.ts`.
 3. **Команды Windows / PowerShell:** используйте неинтерактивные флаги и проверяйте изменения перед ответом:
+   - **Текущий режим по решению пользователя от 23.11.2026: собираем только веб-версию.** Проверка типов, веб-сборка, профильные тесты и проверка интерфейса сохраняются. Android (включая `android:sync` и APK) и Windows Portable (`dist:win`) отложены до финального этапа или отдельного запроса пользователя; после обычных веб-правок их не запускать. Electron как инструмент проверки интерфейса допустим.
    - Проверка типов: `npx tsc --noEmit`
    - Сборка веба: `npm run build`
    - Dev-сервер: `npm run dev -- --port 5173`
@@ -20,7 +21,7 @@
    - [docs/CORE.md](docs/CORE.md) — независимое ядро, публичные экспорты, структура сценариев и проверки границ.
    - [README.md](README.md) — обзор, возможности (ИМпST + ИМбпST) и структура.
    - [docs/CLINICAL_ENGINE.md](docs/CLINICAL_ENGINE.md) — математика ЭКГ, стадии, ИМбпST/Велленс/де Винтер, ЧКВ и локализатор.
-   - [docs/3D_MODEL.md](docs/3D_MODEL.md) — анатомия `heart_optimized.glb`, координаты, ПКМ-панорамирование, подписи `ArteryLabel` и гайд для Houdini FX.
+   - [docs/3D_MODEL.md](docs/3D_MODEL.md) — анатомия `heart_segmented.glb`, координаты, ПКМ-панорамирование, подписи `ArteryLabel` и гайд для Houdini FX.
    - [docs/DESKTOP_BUILD.md](docs/DESKTOP_BUILD.md) — упаковка в автономный Windows Portable `.exe` на базе Electron.
    - [docs/ANDROID_BUILD.md](docs/ANDROID_BUILD.md) — Android-оболочка Capacitor 8, сборка APK и проверка на устройстве.
    - [docs/IOS_PWA.md](docs/IOS_PWA.md) — офлайн-PWA для iPhone (Service Worker `sw.js`, иконки, GitHub Pages).
@@ -52,7 +53,7 @@
    Heart3D.tsx          AhaBullseye.tsx           LeadCardsPanel.tsx         EcgPaper.tsx
   (тромб/бляшка/стент, (17 сегм. ЛЖ + ПЖ,         (12+5 мини-ЭКГ,          LiveMonitor.tsx
    окраска TIMI 0..3    трансмур./субэндокард.)    ST↑/ST↓/T↓/dW T↑/T+/-)  (реал-тайм + лента)
-   и миокарда, КАГ)
+   сосудов, КАГ)
 ```
 
 Вторым сквозным параметром является динамика во времени:
@@ -64,11 +65,11 @@
 
 | Задача | Какие файлы менять |
 | :--- | :--- |
-| Добавить новый сценарий ИМпST / ИМбпST / мимик | `src/core/types.ts` (`CaseId`), `src/core/content/coronaryCases.ts` (`CORONARY_CASES`, `CASE_ORDER`, привязки в `src/presentation/heartLandmarks.ts` и при необходимости `replacesBaseMarker`), `src/data/angiographyProjections.ts` (`CASE_OPTIMAL_PROJECTION`, `getOptimalProjectionForCase`), `src/components/Heart3D.tsx` (`LCA_CASE_SET`, `isVertexDistalToOcclusion`), `src/components/AtlasView.tsx` (`STEMI_CASES`/`NSTEMI_CASES`/`CHIP_LABELS`), при необходимости `src/core/ecg/localizer.ts` |
+| Добавить новый сценарий ИМпST / ИМбпST / мимик | `src/core/types.ts` (`CaseId`), `src/core/content/coronaryCases.ts` (`CORONARY_CASES`, `CASE_ORDER`, привязки в `src/presentation/heartLandmarks.ts` и при необходимости `replacesBaseMarker`), `src/data/angiographyProjections.ts` (`CASE_OPTIMAL_PROJECTION`, `getOptimalProjectionForCase`), `src/presentation/segmentedHeart.ts` и `src/presentation/arteryLabels.ts`, `src/components/AtlasView.tsx` (`STEMI_CASES`/`NSTEMI_CASES`/`CHIP_LABELS`), при необходимости `src/core/ecg/localizer.ts` |
 | Настроить морфологию волн (de Winter, Wellens, Sgarbossa, Brugada) | `src/core/types.ts` (`StShape`, `LeadShiftProfile`), `src/core/ecg/ecgEngine.ts` (`sampleBeatMv`, `getLeadBadge`) |
 | Изменить стадии времени или эффект ЧКВ (TIMI 3) | `src/core/ecg/ecgEngine.ts` (`STAGE_PRESETS`, `NSTEMI_STAGE_SUMMARIES`, `DE_WINTER_STAGE_SUMMARIES`, `NATURAL_KEYFRAMES`, `REPERFUSED_KEYFRAMES`, `computeStageModifiers`), `src/components/TimelineBar.tsx` |
 | Добавить отведения / поменять сетку бумаги или калипер | `src/components/EcgPaper.tsx`, `src/core/ecg/ecgEngine.ts` (`NORMAL_LEAD_BASE`) |
-| Изменить 3D-проекции КАГ, ПКМ-панорамирование или подписи артерий | `src/data/angiographyProjections.ts`, `src/utils/cArmMath.ts`, `src/components/CArmDiagram.tsx`, `src/components/Heart3D.tsx` (`ArteryLabel`, `CameraRig`, `LabelMode`, `isVertexDistalToOcclusion`, `classifyMyocardiumVertex`) |
+| Изменить 3D-проекции КАГ, ПКМ-панорамирование или подписи артерий | `src/data/angiographyProjections.ts`, `src/utils/cArmMath.ts`, `src/components/CArmDiagram.tsx`, `src/components/Heart3D.tsx` (`ArteryLabel`, `CameraRig`, `LabelMode`), `src/presentation/segmentedHeart.ts`, `src/presentation/arteryLabels.ts` |
 | Заменить 3D-модель сердца (напр., `.glb` из Houdini) | `public/models/heart/`, `src/components/Heart3D.tsx` (см. `docs/3D_MODEL.md`) |
 | Обновить сборку Windows `.exe` (Electron) | `electron/main.cjs`, `package.json` (`build`, `scripts`), `build/icon.ico` (см. `docs/DESKTOP_BUILD.md`) |
 
@@ -80,22 +81,19 @@
 - **Никогда** не вызывайте `useMemo` / `useEffect` / `useState` внутри функций-рендереров (например, `renderCard`), которые вызываются разное количество раз при раскрытии/сворачивании секции `Доп. отведения (V3R–V4R, V7–V9)`.
 - Каждая карточка отведения **должна** оставаться отдельным компонентом (`<LeadCard />`). Нарушение этого правила уже вызывало падение React (`Rendered more hooks than during the previous render`) при переключении с `lad_prox` на `rca_prox`.
 
-### B. Загрузка `heart_optimized.glb` и текстуры `heart_diffuse.webp` (`Heart3D.tsx`)
-- Модель в `public/models/heart/heart_optimized.glb` сконвертирована из оптимизированной сцены Houdini скриптом `scripts/convert_geo_to_glb.py` и загружается через `GLTFLoader` ровно один раз (`useEffect(..., [])` с полным `dispose()` в cleanup).
-- В качестве диффузной карты используется `${import.meta.env.BASE_URL}models/heart/heart_diffuse.webp` (`1024×1024` WebP, `colorSpace = THREE.SRGBColorSpace`), а геометрия загружается из `${import.meta.env.BASE_URL}models/heart/heart_optimized.glb`. Поскольку UV-координаты в `.glb` записаны по стандарту glTF 2.0 (`v=0` вверху), **обязательно сохранять `diffuseTex.flipY = false`**.
-- **Никогда не прокидывайте изменяемые при вращении камеры пропсы/состояние (например, `liveAngles`) в `<HeartCanvasViewport>`** и сохраняйте стабильный `onLoaded` через `ref`, чтобы поворот С-дуги не перезапускал загрузку или ререндер Canvas.
+### B. Загрузка `heart_segmented.glb` (`Heart3D.tsx`)
+- Текущая модель — `public/models/heart/heart_segmented.glb` (14 мешей, 90 234 треугольника). `GLTFLoader` загружает её один раз через `${import.meta.env.BASE_URL}models/heart/heart_segmented.glb`; цвета сохранены в `COLOR_0`. Старые `heart_optimized.glb` и `heart_diffuse.webp` — архивные ассеты.
+- **Не передавать изменяемые при вращении камеры значения, например `liveAngles`, в `<HeartCanvasViewport>`**; стабилизировать `onLoaded` через ref, чтобы поворот С-дуги не перезапускал загрузку или ререндер Canvas.
 
-### C. Локальные координаты `heart_optimized.glb` и `Box3`
-- Лёгочные сосудистые деревья удалены на уровне оптимизированной геометрии (пропущено 7 остаточных полигонов `LPV_MiCorazon_0`), но исходные сырые координаты вершин (`[-5000..+5000]`) в `.glb` сохранены 1-в-1 относительно оригинальной модели.
-- Поэтому:
-  1. Функции `isVertexDistalToOcclusion()` и предрасчёт `classifyMyocardiumVertex()` (выполняется 1 раз при загрузке в `myoCacheRef` `Uint8Array`) работают с **исходными локальными координатами геометрии `.glb`**.
-  2. Мировые позиции для кликабельных 3D-маркеров (`landmarks`) **обязаны** вычисляться через `targetMesh.localToWorld(...)` **только после** центрирования, масштабирования корневой группы и вызова `wrapper.updateMatrixWorld(true)`.
+### C. Координаты модели и маркеры
+- Именованные артериальные сегменты и исходные локальные координаты хранятся в GLB. Ориентиры — `src/presentation/heartSegmentGeometry.ts`, маркеры случаев — `src/presentation/heartLandmarks.ts`. После экспорта обновить ориентиры `node scripts/prepare-segmented-heart.mjs` и проверить `npm run test:heart`.
+- Мировые позиции маркеров вычисляются через `targetMesh.localToWorld(...)` **после** центрирования и масштабирования корневой группы и `wrapper.updateMatrixWorld(true)`.
+- Границы сегментов и анатомическую корректность авторской разметки необходимо проверять отдельно: совпадение маркера с вершиной не доказывает анатомическую точность.
 
-### D. Вертексная раскраска (`vertexColors`) и производительность WebGL
-- Артерии (`LCA_MiCorazon_0`, `CA_MiCorazon_0`) используют **4-компонентный буфер RGBA** (`itemSize = 4`) и хранят пару заранее созданных материалов (`mesh.userData.anatMat` для режима Анатомия 3D и `mesh.userData.angioMat` для режима КАГ).
-- В режиме `Анатомия 3D` материал артерий непрозрачный (`transparent: false`), а в режиме `КАГ (С-дуга)` используется `MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false })` — это позволяет чисто отсекать чужой бассейн и дистальное русло при `TIMI 0` («культя» обрыва контраста) через альфа-канал.
-- Миокард (`HS_1_MiCorazon_0`, `HS_2_Difumina_0`) в режиме Анатомия использует `map: diffuseTex` + `vertexColors: true` (3-компонентный буфер), а в режиме КАГ переключается на полупрозрачную рентгеновскую тень (`depthWrite: false`).
-- **Пересчёт вертексных цветов делается в `useEffect`** при смене параметров, а в `useFrame` допускается только во время короткой (~1.7 с) анимации болюса контраста (`bolusAnimatingRef.current === true`).
+### D. Раскраска (`vertexColors`) и производительность WebGL
+- `src/presentation/segmentedHeart.ts` сопоставляет случаи с именованными артериальными сегментами; подписи сосудов находятся в `src/presentation/arteryLabels.ts`. Артерии используют 4-компонентный RGBA и заранее созданные материалы анатомии и КАГ. Исходный цвет `Cd` сохраняется и восстанавливается при нормальном кровотоке; при окклюзии дистальный сегмент серый.
+- В КАГ полупрозрачный материал с `depthWrite: false` позволяет скрыть другой бассейн и дистальное русло при TIMI 0. Вершинные цвета пересчитываются в `useEffect`, а в `useFrame` — только при короткой анимации болюса.
+- Модель имеет объединённый `heart_body` без разметки AHA и отдельного слоя вен. Поверхность 3D не окрашивается по зонам миокарда; поражение миокарда показывается на AHA-схеме. Геометрия праводоминантная, переключение левого типа условное.
 
 ### E. Разделение логики ручного и пресетного режимов
 - `localizeFromManualLeads()` возвращает `primaryCaseId: null` при недостаточной разметке; это **не** заключение о норме. В таком случае показываются ручные изменения ЭКГ, а анатомия и диагноз пресета скрыты. Числовой «уверенности» нет. Велленс A и де Винтер доступны как пресеты, но не распознаются автоматически по одному ST↑/ST↓/T↓ без ввода необходимой морфологии.
@@ -111,7 +109,7 @@
 
 ### G. Сборка десктопного Windows `.exe` (`electron/main.cjs`)
 - `Heart3D.tsx` и сборка Vite используют относительную базу `base: './'` (`import.meta.env.BASE_URL`), что работает при открытии `app://localhost/index.html` в Electron, а не через `file://`. Поэтому главный процесс [`electron/main.cjs`](electron/main.cjs) регистрирует привилегированную схему `app://localhost/...` (`protocol.registerSchemesAsPrivileged` строго до `app.whenReady()`) и отдаёт файлы из `dist/` с явными MIME-типами и проверкой path traversal.
-- После изменений в веб-части пересборка портативного `.exe` выполняется командой `npm run dist:win` (результат — `release/CardioAtlas-ECG-1.0.0-Portable.exe`). Подробнее см. [docs/DESKTOP_BUILD.md](docs/DESKTOP_BUILD.md).
+- На финальном этапе или по отдельному запросу пользователя пересборка портативного `.exe` выполняется командой `npm run dist:win` (результат — `release/CardioAtlas-ECG-1.0.0-Portable.exe`). При текущей работе только над веб-версией эту сборку не запускать. Подробнее см. [docs/DESKTOP_BUILD.md](docs/DESKTOP_BUILD.md).
 
 ---
 
@@ -141,7 +139,7 @@
 
 ### L. Android-оболочка
 - Конфигурация — `capacitor.config.json`, проект — `android/`, инструкция — `docs/ANDROID_BUILD.md`. `server.url` в локальной сборке запрещён: интерфейс и модель должны попадать в APK.
-- После изменений веб-части `npm run android:sync` обновляет ресурсы и сравнивает их с `dist`. Не редактировать копии `android/app/src/main/assets/public` вручную.
+- На финальном этапе Android или по отдельному запросу пользователя `npm run android:sync` обновляет ресурсы и сравнивает их с `dist`. При текущей работе только над веб-версией синхронизацию не запускать. Не редактировать копии `android/app/src/main/assets/public` вручную.
 - Определение платформы находится в `src/platform/runtime.ts`; мобильная оболочка (и установленная PWA) начинает с тренировки (`preferTrainingHome`). В ядро Capacitor не импортировать.
 - `MainActivity.java` обрабатывает системную кнопку/жест «Назад» через `OnBackPressedCallback` в связке с `window.history` в `App.tsx` и `TrainingPanel.tsx`.
 - Проверка ресурсов и Chromium не подтверждают работу APK. Сборка требует JDK 21 и SDK Platform 36; проверка телефона описана в инструкции.
@@ -154,7 +152,7 @@
 ## 5. Чек-лист перед завершением любой правки
 
 1. `npx tsc --noEmit` — 0 ошибок.
-2. `npm run build` — успешная сборка `dist/`, наличие `dist/models/heart/heart_optimized.glb` и `heart_diffuse.webp`.
+2. `npm run build` — успешная сборка `dist/`, наличие `dist/models/heart/heart_segmented.glb`.
 3. Визуальная проверка в браузере (`http://localhost:5173/`):
    - 0 ошибок в консоли и 0 404-запросов в Network.
    - Переключение между кейсами с пустым `recommendedExtraLeads` (например, `lad_prox`) и с непустым (`rca_prox`, `lcx`, `posterior`, `nstemi_inf`) не вызывает ошибок хуков.
