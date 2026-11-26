@@ -1,5 +1,5 @@
 import type { CaseId, Dominance } from '../core/types';
-import { HEART_SEGMENT_GEOMETRY } from './heartSegmentGeometry';
+import { HEART_SEGMENT_GEOMETRY, getHeartSegmentGeometry } from './heartSegmentGeometry';
 
 export type ArterySegment = keyof typeof HEART_SEGMENT_GEOMETRY;
 export const ARTERY_SEGMENTS = Object.keys(HEART_SEGMENT_GEOMETRY) as ArterySegment[];
@@ -26,7 +26,7 @@ export function affectedArterySegments(caseId: CaseId, dominance: Dominance): re
 
 /** Иллюстративное продвижение контраста по сегментам, не измерение времени кровотока. */
 export function segmentContrastDistance(name: ArterySegment, x: number, y: number, z: number, dominance: Dominance): number {
-  const { entry, end } = HEART_SEGMENT_GEOMETRY[name];
+  const { entry, end } = getHeartSegmentGeometry(dominance)[name];
   const dx = end[0] - entry[0], dy = end[1] - entry[1], dz = end[2] - entry[2];
   const t = Math.max(0, Math.min(1, ((x-entry[0])*dx + (y-entry[1])*dy + (z-entry[2])*dz) / (dx*dx+dy*dy+dz*dz)));
   const start: Record<ArterySegment, number> = { LMCA: 0, LAD_prox: .12, LAD_mid: .4, LAD_dist: .65,

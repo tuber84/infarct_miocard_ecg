@@ -1,6 +1,6 @@
-import { HEART_SEGMENT_GEOMETRY } from './heartSegmentGeometry';
+import { HEART_SEGMENT_GEOMETRY, HEART_SEGMENT_GEOMETRY_LEFT } from './heartSegmentGeometry';
 import type { ArterySegment } from './segmentedHeart';
-import type { CaseId } from '../core/types';
+import type { CaseId, Dominance } from '../core/types';
 
 export interface OcclusionLandmark {
   /** Имя меша в модели сердца */
@@ -13,87 +13,98 @@ export interface OcclusionLandmark {
   replacesBaseMarker?: CaseId;
 }
 
-/** Привязки к конкретной геометрии сердца; не входят в медицинское ядро. */
-export const HEART_LANDMARKS: Partial<Record<CaseId, OcclusionLandmark>> = {
-  lad_prox: {
+type SegmentGeometryMap = typeof HEART_SEGMENT_GEOMETRY | typeof HEART_SEGMENT_GEOMETRY_LEFT;
+
+function buildHeartLandmarks(geom: SegmentGeometryMap): Partial<Record<CaseId, OcclusionLandmark>> {
+  return {
+    lad_prox: {
       mesh: 'LAD_prox',
-      localPos: [...HEART_SEGMENT_GEOMETRY.LAD_prox.marker],
+      localPos: [...geom.LAD_prox.marker],
       vesselRegion: 'lad_prox',
-  },
-  lad_mid: {
+    },
+    lad_mid: {
       mesh: 'LAD_mid',
-      localPos: [...HEART_SEGMENT_GEOMETRY.LAD_mid.marker],
+      localPos: [...geom.LAD_mid.marker],
       vesselRegion: 'lad_mid',
-  },
-  lad_wrap: {
+    },
+    lad_wrap: {
       mesh: 'LAD_dist',
-      localPos: [...HEART_SEGMENT_GEOMETRY.LAD_dist.marker],
+      localPos: [...geom.LAD_dist.marker],
       vesselRegion: 'lad_wrap',
-  },
-  d1: {
+    },
+    d1: {
       mesh: 'D1',
-      localPos: [...HEART_SEGMENT_GEOMETRY.D1.marker],
+      localPos: [...geom.D1.marker],
       vesselRegion: 'd1',
-  },
-  rca_prox: {
+    },
+    rca_prox: {
       mesh: 'RCA_prox',
-      localPos: [...HEART_SEGMENT_GEOMETRY.RCA_prox.marker],
+      localPos: [...geom.RCA_prox.marker],
       vesselRegion: 'rca_prox',
-  },
-  rca_dist: {
+    },
+    rca_dist: {
       mesh: 'RCA_dist',
-      localPos: [...HEART_SEGMENT_GEOMETRY.RCA_dist.marker],
+      localPos: [...geom.RCA_dist.marker],
       vesselRegion: 'rca_dist',
-  },
-  lcx: {
+    },
+    lcx: {
       mesh: 'LCx',
-      localPos: [...HEART_SEGMENT_GEOMETRY.LCx.marker],
+      localPos: [...geom.LCx.marker],
       vesselRegion: 'lcx',
-  },
-  posterior: {
+    },
+    posterior: {
       mesh: 'PLB',
-      localPos: [...HEART_SEGMENT_GEOMETRY.PLB.marker],
+      localPos: [...geom.PLB.marker],
       vesselRegion: 'posterior',
-  },
-  lmca: {
+    },
+    lmca: {
       mesh: 'LMCA',
-      localPos: [...HEART_SEGMENT_GEOMETRY.LMCA.marker],
+      localPos: [...geom.LMCA.marker],
       vesselRegion: 'lmca',
-  },
-  nstemi_antlat: {
+    },
+    nstemi_antlat: {
       mesh: 'LAD_mid',
-      localPos: [...HEART_SEGMENT_GEOMETRY.LAD_mid.marker],
+      localPos: [...geom.LAD_mid.marker],
       vesselRegion: 'nstemi_antlat',
       replacesBaseMarker: 'lad_mid',
-  },
-  nstemi_inf: {
+    },
+    nstemi_inf: {
       mesh: 'RCA_dist',
-      localPos: [...HEART_SEGMENT_GEOMETRY.RCA_dist.marker],
+      localPos: [...geom.RCA_dist.marker],
       vesselRegion: 'nstemi_inf',
       replacesBaseMarker: 'rca_dist',
-  },
-  nstemi_tinv: {
+    },
+    nstemi_tinv: {
       mesh: 'LAD_mid',
-      localPos: [...HEART_SEGMENT_GEOMETRY.LAD_mid.marker],
+      localPos: [...geom.LAD_mid.marker],
       vesselRegion: 'nstemi_tinv',
       replacesBaseMarker: 'lad_mid',
-  },
-  wellens_a: {
+    },
+    wellens_a: {
       mesh: 'LAD_prox',
-      localPos: [...HEART_SEGMENT_GEOMETRY.LAD_prox.marker],
+      localPos: [...geom.LAD_prox.marker],
       vesselRegion: 'wellens_a',
       replacesBaseMarker: 'lad_prox',
-  },
-  wellens_b: {
+    },
+    wellens_b: {
       mesh: 'LAD_prox',
-      localPos: [...HEART_SEGMENT_GEOMETRY.LAD_prox.marker],
+      localPos: [...geom.LAD_prox.marker],
       vesselRegion: 'wellens_b',
       replacesBaseMarker: 'lad_prox',
-  },
-  de_winter: {
+    },
+    de_winter: {
       mesh: 'LAD_prox',
-      localPos: [...HEART_SEGMENT_GEOMETRY.LAD_prox.marker],
+      localPos: [...geom.LAD_prox.marker],
       vesselRegion: 'de_winter',
       replacesBaseMarker: 'lad_prox',
-  },
-};
+    },
+  };
+}
+
+/** Привязки к конкретной геометрии сердца; не входят в медицинское ядро. */
+export const HEART_LANDMARKS = buildHeartLandmarks(HEART_SEGMENT_GEOMETRY);
+export const HEART_LANDMARKS_LEFT = buildHeartLandmarks(HEART_SEGMENT_GEOMETRY_LEFT);
+
+export function getHeartLandmarks(dominance: Dominance): Partial<Record<CaseId, OcclusionLandmark>> {
+  return dominance === 'left' ? HEART_LANDMARKS_LEFT : HEART_LANDMARKS;
+}

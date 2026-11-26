@@ -1,6 +1,6 @@
 import { ARTERY_SEGMENTS, affectedArterySegments, isLeftCoronarySegment, segmentContrastDistance, type ArterySegment } from '../presentation/segmentedHeart';
-import { HEART_SEGMENT_GEOMETRY } from '../presentation/heartSegmentGeometry';
-import { HEART_LANDMARKS } from '../presentation/heartLandmarks';
+import { getHeartSegmentGeometry } from '../presentation/heartSegmentGeometry';
+import { getHeartLandmarks } from '../presentation/heartLandmarks';
 import { ARTERY_LABELS } from '../presentation/arteryLabels';
 import React, {
   Component,
@@ -310,6 +310,117 @@ interface HeartSceneProps extends Heart3DProps {
   onLoaded: () => void;
 }
 
+function disposeSceneResources(root: THREE.Object3D) {
+  root.traverse((child) => {
+    if ((child as THREE.Mesh).isMesh) {
+      const mesh = child as THREE.Mesh;
+      mesh.geometry.dispose();
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      materials.forEach((material) => material?.dispose());
+      (mesh.userData.anatMat as THREE.Material | undefined)?.dispose();
+      (mesh.userData.angioMat as THREE.Material | undefined)?.dispose();
+    }
+  });
+}
+
+function setupArteryMesh(mesh: THREE.Mesh, meshName: string, dominance: Dominance) {
+  mesh.userData.baseColors = new Float32Array(mesh.geometry.attributes.color.array);
+  const importedMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  importedMaterials.forEach((material) => material.dispose());
+
+  const anatMat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.32,
+    metalness: 0.08,
+    transparent: false,
+  });
+  const angioMat = new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+  });
+
+  const posAttr = mesh.geometry.attributes.position;
+  const colors = new Float32Array(posAttr.count * 4).fill(1);
+  mesh.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+
+  const dists = new Float32Array(posAttr.count);
+  const inLcaFlags = new Uint8Array(posAttr.count);
+  const isLcaMesh = isLeftCoronarySegment(meshName);
+
+  for (let i = 0; i < posAttr.count; i++) {
+    dists[i] = segmentContrastDistance(
+      meshName as ArterySegment,
+      posAttr.getX(i),
+      posAttr.getY(i),
+      posAttr.getZ(i),
+      dominance
+    );
+    inLcaFlags[i] = isLcaMesh ? 1 : 0;
+  }
+
+  mesh.userData.anatMat = anatMat;
+  mesh.userData.angioMat = angioMat;
+  mesh.material = anatMat;
+
+  return { dists, inLcaFlags };
+}
+
+function computeLandmarksForDominance(
+  dominance: Dominance,
+  meshMap: Record<string, THREE.Mesh>
+): LandmarkWorldPos[] {
+  const landmarkDefs = getHeartLandmarks(dominance);
+  const segmentGeom = getHeartSegmentGeometry(dominance);
+  const computed: LandmarkWorldPos[] = [];
+
+  for (const id of CASE_ORDER) {
+    const landmark = landmarkDefs[id];
+    if (!landmark) continue;
+    const targetMesh = meshMap[landmark.mesh];
+    if (!targetMesh) continue;
+
+    const posAttr = targetMesh.geometry.attributes.position;
+    const [tx, ty, tz] = landmark.localPos;
+    let bestIdx = 0;
+    let bestDistSq = Infinity;
+    for (let i = 0; i < posAttr.count; i++) {
+      const dx = posAttr.getX(i) - tx;
+      const dy = posAttr.getY(i) - ty;
+      const dz = posAttr.getZ(i) - tz;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < bestDistSq) {
+        bestDistSq = d2;
+        bestIdx = i;
+      }
+    }
+
+    const localPt = new THREE.Vector3(
+      posAttr.getX(bestIdx),
+      posAttr.getY(bestIdx),
+      posAttr.getZ(bestIdx)
+    );
+    const worldPos = targetMesh.localToWorld(localPt.clone());
+
+    const neighborLocal = localPt
+      .clone()
+      .add(new THREE.Vector3(...segmentGeom[landmark.mesh].tangent).multiplyScalar(0.01));
+    const neighborWorld = targetMesh.localToWorld(neighborLocal);
+    const tangent = neighborWorld.sub(worldPos).normalize();
+    if (tangent.lengthSq() < 0.01) tangent.set(0, -1, 0);
+
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(UP_AXIS, tangent);
+
+    computed.push({
+      caseId: id,
+      worldPos,
+      quaternion,
+    });
+  }
+
+  return computed;
+}
+
 function HeartSceneContent({
   activeCaseId,
   onSelectCase,
@@ -324,13 +435,26 @@ function HeartSceneContent({
   onLoaded,
 }: HeartSceneProps) {
   const [modelGroup, setModelGroup] = useState<THREE.Group | null>(null);
-  const [landmarks, setLandmarks] = useState<LandmarkWorldPos[]>([]);
+  const [landmarksByDominance, setLandmarksByDominance] = useState<Record<Dominance, LandmarkWorldPos[]>>({
+    right: [],
+    left: [],
+  });
   const [hoveredCase, setHoveredCase] = useState<CaseId | null>(null);
   const thrombusRef = useRef<THREE.Mesh>(null);
   const ringRef = useRef<THREE.Mesh>(null);
-  const meshMapRef = useRef<Record<string, THREE.Mesh>>({});
-  const arteryDistRef = useRef<Record<string, Float32Array>>({});
-  const arteryInLcaRef = useRef<Record<string, Uint8Array>>({});
+  const bodyMeshRef = useRef<THREE.Mesh | null>(null);
+  const arteryMeshesByDominanceRef = useRef<Record<Dominance, Record<string, THREE.Mesh>>>({
+    right: {},
+    left: {},
+  });
+  const arteryDistByDominanceRef = useRef<Record<Dominance, Record<string, Float32Array>>>({
+    right: {},
+    left: {},
+  });
+  const arteryInLcaByDominanceRef = useRef<Record<Dominance, Record<string, Uint8Array>>>({
+    right: {},
+    left: {},
+  });
 
   // Стабилизируем колбэк, чтобы загрузка GLB никогда не перезапускалась при ререндерах
   const onLoadedRef = useRef(onLoaded);
@@ -339,91 +463,82 @@ function HeartSceneContent({
   const bolusProgressRef = useRef<number>(1.2);
   const bolusAnimatingRef = useRef<boolean>(false);
 
-  // Загрузка сегментированного GLB с цветами вершин строго 1 раз + полный dispose при размонтировании
+  // Загрузка обоих сегментированных GLB (правый + левый типы) строго 1 раз + полный dispose при размонтировании
   useEffect(() => {
     let cancelled = false;
-    let loadedMeshMap: Record<string, THREE.Mesh> | null = null;
+    let loadedWrapper: THREE.Group | null = null;
 
     const assetBase = import.meta.env.BASE_URL;
     const loader = new GLTFLoader();
-    loader.load(
-      `${assetBase}models/heart/heart_segmented.glb`,
-      (gltf) => {
-        const rootScene = gltf.scene;
+
+    Promise.all([
+      loader.loadAsync(`${assetBase}models/heart/heart_segmented.glb`),
+      loader.loadAsync(`${assetBase}models/heart/heart_artery_left_type.glb`),
+    ])
+      .then(([rightGltf, leftGltf]) => {
+        const rightScene = rightGltf.scene;
+        const leftScene = leftGltf.scene;
+
         if (cancelled) {
-          rootScene.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-              const mesh = child as THREE.Mesh;
-              mesh.geometry.dispose();
-              const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-              materials.forEach(material => material.dispose());
-            }
-          });
+          disposeSceneResources(rightScene);
+          disposeSceneResources(leftScene);
           return;
         }
 
-        const meshMap: Record<string, THREE.Mesh> = {};
-        const distMap: Record<string, Float32Array> = {};
-        const inLcaMap: Record<string, Uint8Array> = {};
+        const rightMeshes: Record<string, THREE.Mesh> = {};
+        const rightDists: Record<string, Float32Array> = {};
+        const rightInLca: Record<string, Uint8Array> = {};
+        let bodyMesh: THREE.Mesh | null = null;
 
-        rootScene.traverse((child) => {
+        rightScene.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
             const meshName = mesh.name || mesh.parent?.name || '';
             mesh.name = meshName;
-            meshMap[meshName] = mesh;
 
-            const isArtery = ARTERY_NAMES.includes(meshName);
-
-            mesh.userData.baseColors = new Float32Array(mesh.geometry.attributes.color.array);
-            const importedMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-            importedMaterials.forEach(material => material.dispose());
-            let anatMat: THREE.Material;
-            let angioMat: THREE.Material;
-
-            if (isArtery) {
-              anatMat = new THREE.MeshStandardMaterial({
-                vertexColors: true,
-                roughness: 0.32,
-                metalness: 0.08,
-                transparent: false,
-              });
-              angioMat = new THREE.MeshBasicMaterial({
-                vertexColors: true,
-                transparent: true,
-                depthWrite: false,
-              });
-
-              const posAttr = mesh.geometry.attributes.position;
-              const colors = new Float32Array(posAttr.count * 4).fill(1);
-              mesh.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
-
-              const dists = new Float32Array(posAttr.count);
-              const inLcaFlags = new Uint8Array(posAttr.count);
-              const isLcaMesh = isLeftCoronarySegment(meshName);
-
-              for (let i = 0; i < posAttr.count; i++) {
-                const vx = posAttr.getX(i);
-                const vy = posAttr.getY(i);
-                const vz = posAttr.getZ(i);
-                dists[i] = segmentContrastDistance(meshName as ArterySegment, vx, vy, vz, 'right');
-                inLcaFlags[i] = isLcaMesh ? 1 : 0;
-              }
-              distMap[meshName] = dists;
-              inLcaMap[meshName] = inLcaFlags;
+            if (ARTERY_NAMES.includes(meshName)) {
+              rightMeshes[meshName] = mesh;
+              const { dists, inLcaFlags } = setupArteryMesh(mesh, meshName, 'right');
+              rightDists[meshName] = dists;
+              rightInLca[meshName] = inLcaFlags;
             } else {
-              anatMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0 });
-              angioMat = new THREE.MeshBasicMaterial({ color: '#64748b', transparent: true, opacity: 0.11, depthWrite: false });
+              mesh.userData.baseColors = new Float32Array(mesh.geometry.attributes.color.array);
+              const importedMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              importedMaterials.forEach((material) => material.dispose());
+              const anatMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0 });
+              const angioMat = new THREE.MeshBasicMaterial({ color: '#64748b', transparent: true, opacity: 0.11, depthWrite: false });
+              mesh.userData.anatMat = anatMat;
+              mesh.userData.angioMat = angioMat;
+              mesh.material = anatMat;
+              bodyMesh = mesh;
             }
-
-            mesh.userData.anatMat = anatMat;
-            mesh.userData.angioMat = angioMat;
-            mesh.material = anatMat;
           }
         });
 
-        rootScene.updateMatrixWorld(true);
-        const coreBox = new THREE.Box3().setFromObject(rootScene);
+        const leftMeshes: Record<string, THREE.Mesh> = {};
+        const leftDists: Record<string, Float32Array> = {};
+        const leftInLca: Record<string, Uint8Array> = {};
+
+        leftScene.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            const meshName = mesh.name || mesh.parent?.name || '';
+            mesh.name = meshName;
+
+            if (ARTERY_NAMES.includes(meshName)) {
+              leftMeshes[meshName] = mesh;
+              const { dists, inLcaFlags } = setupArteryMesh(mesh, meshName, 'left');
+              leftDists[meshName] = dists;
+              leftInLca[meshName] = inLcaFlags;
+              mesh.visible = false;
+            } else {
+              mesh.visible = false;
+            }
+          }
+        });
+
+        rightScene.updateMatrixWorld(true);
+        const coreBox = new THREE.Box3().setFromObject(rightScene);
 
         const size = new THREE.Vector3();
         const center = new THREE.Vector3();
@@ -434,108 +549,74 @@ function HeartSceneContent({
         const normScale = 3.15 / maxDim;
 
         const wrapper = new THREE.Group();
-        rootScene.scale.multiplyScalar(normScale);
-        rootScene.position.set(
-          -center.x * normScale,
-          -center.y * normScale,
-          -center.z * normScale
-        );
-        wrapper.add(rootScene);
+        for (const scenePart of [rightScene, leftScene]) {
+          scenePart.scale.multiplyScalar(normScale);
+          scenePart.position.set(
+            -center.x * normScale,
+            -center.y * normScale,
+            -center.z * normScale
+          );
+          wrapper.add(scenePart);
+        }
         wrapper.updateMatrixWorld(true);
 
-        const computedLandmarks: LandmarkWorldPos[] = [];
-        for (const id of CASE_ORDER) {
-          const landmark = HEART_LANDMARKS[id];
-          if (!landmark) continue;
-          const targetMesh = meshMap[landmark.mesh];
-          if (!targetMesh) continue;
+        const rightLandmarks = computeLandmarksForDominance('right', rightMeshes);
+        const leftLandmarks = computeLandmarksForDominance('left', leftMeshes);
 
-          const posAttr = targetMesh.geometry.attributes.position;
-          const [tx, ty, tz] = landmark.localPos;
-          let bestIdx = 0;
-          let bestDistSq = Infinity;
-          for (let i = 0; i < posAttr.count; i++) {
-            const dx = posAttr.getX(i) - tx;
-            const dy = posAttr.getY(i) - ty;
-            const dz = posAttr.getZ(i) - tz;
-            const d2 = dx * dx + dy * dy + dz * dz;
-            if (d2 < bestDistSq) {
-              bestDistSq = d2;
-              bestIdx = i;
-            }
-          }
+        loadedWrapper = wrapper;
+        bodyMeshRef.current = bodyMesh;
+        arteryMeshesByDominanceRef.current = { right: rightMeshes, left: leftMeshes };
+        arteryDistByDominanceRef.current = { right: rightDists, left: leftDists };
+        arteryInLcaByDominanceRef.current = { right: rightInLca, left: leftInLca };
 
-          const localPt = new THREE.Vector3(
-            posAttr.getX(bestIdx),
-            posAttr.getY(bestIdx),
-            posAttr.getZ(bestIdx)
-          );
-          const worldPos = targetMesh.localToWorld(localPt.clone());
-
-          const neighborLocal = localPt.clone().add(new THREE.Vector3(...HEART_SEGMENT_GEOMETRY[landmark.mesh].tangent).multiplyScalar(0.01));
-          const neighborWorld = targetMesh.localToWorld(neighborLocal);
-          const tangent = neighborWorld.sub(worldPos).normalize();
-          if (tangent.lengthSq() < 0.01) tangent.set(0, -1, 0);
-
-          const quaternion = new THREE.Quaternion().setFromUnitVectors(UP_AXIS, tangent);
-
-          computedLandmarks.push({
-            caseId: id,
-            worldPos,
-            quaternion,
-          });
-        }
-
-        loadedMeshMap = meshMap;
-        meshMapRef.current = meshMap;
-        arteryDistRef.current = distMap;
-        arteryInLcaRef.current = inLcaMap;
-
-        setLandmarks(computedLandmarks);
+        setLandmarksByDominance({ right: rightLandmarks, left: leftLandmarks });
         setModelGroup(wrapper);
         onLoadedRef.current();
-      },
-      undefined,
-      (err) => {
-        console.error('Ошибка загрузки GLB модели сердца:', err);
-      }
-    );
+      })
+      .catch((err) => {
+        console.error('Ошибка загрузки GLB моделей сердца:', err);
+      });
 
     return () => {
       cancelled = true;
-
-      if (loadedMeshMap) {
-        Object.values(loadedMeshMap).forEach((mesh) => {
-          mesh.geometry.dispose();
-          const anatMat = mesh.userData.anatMat as THREE.Material | undefined;
-          const angioMat = mesh.userData.angioMat as THREE.Material | undefined;
-          anatMat?.dispose();
-          angioMat?.dispose();
-        });
+      if (loadedWrapper) {
+        disposeSceneResources(loadedWrapper);
       }
     };
   }, []);
 
-  // Переключение материалов и видимости слоёв при смене режима (Анатомия <-> КАГ)
+  // Переключение материалов и видимости слоёв при смене режима (Анатомия <-> КАГ) и доминирования
   useEffect(() => {
     if (!modelGroup) return;
-    const meshes = meshMapRef.current;
 
-    Object.entries(meshes).forEach(([name, mesh]) => {
+    const bodyMesh = bodyMeshRef.current;
+    if (bodyMesh) {
       const targetMat =
-        viewMode === 'angio' ? mesh.userData.angioMat : mesh.userData.anatMat;
-      if (targetMat && mesh.material !== targetMat) {
-        mesh.material = targetMat;
+        viewMode === 'angio' ? bodyMesh.userData.angioMat : bodyMesh.userData.anatMat;
+      if (targetMat && bodyMesh.material !== targetMat) {
+        bodyMesh.material = targetMat;
       }
+      bodyMesh.renderOrder = viewMode === 'angio' ? 1 : 0;
+    }
 
-      if (ARTERY_NAMES.includes(name)) {
-        mesh.renderOrder = viewMode === 'angio' ? 5 : 0;
-      } else {
-        mesh.renderOrder = viewMode === 'angio' ? 1 : 0;
+    for (const dom of ['right', 'left'] as const) {
+      const isVisibleDom = dom === dominance;
+      const meshes = arteryMeshesByDominanceRef.current[dom];
+      for (const artName of ARTERY_NAMES) {
+        const mesh = meshes[artName];
+        if (!mesh) continue;
+        mesh.visible = isVisibleDom;
+        if (isVisibleDom) {
+          const targetMat =
+            viewMode === 'angio' ? mesh.userData.angioMat : mesh.userData.anatMat;
+          if (targetMat && mesh.material !== targetMat) {
+            mesh.material = targetMat;
+          }
+          mesh.renderOrder = viewMode === 'angio' ? 5 : 0;
+        }
       }
-
-    });
-  }, [modelGroup, viewMode]);
+    }
+  }, [modelGroup, viewMode, dominance]);
 
   const resolved = useMemo(
     () => resolveCaseForDominance(activeCaseId, dominance),
@@ -546,9 +627,9 @@ function HeartSceneContent({
   // Обновление вертексных цветов артерий
   const applyArteryColors = useCallback(
     (bolusWave: number) => {
-      const meshes = meshMapRef.current;
-      const distMap = arteryDistRef.current;
-      const inLcaMap = arteryInLcaRef.current;
+      const meshes = arteryMeshesByDominanceRef.current[dominance];
+      const distMap = arteryDistByDominanceRef.current[dominance];
+      const inLcaMap = arteryInLcaByDominanceRef.current[dominance];
       const affected = affectedArterySegments(activeCaseId, dominance);
 
       for (const artName of ARTERY_NAMES) {
@@ -634,15 +715,7 @@ function HeartSceneContent({
   // Пересчёт цветов вне кадра; в useFrame допускается только короткая анимация болюса.
   useEffect(() => {
     if (!modelGroup) return;
-
-    for (const artName of ARTERY_NAMES) {
-      const p = meshMapRef.current[artName]?.geometry.attributes.position;
-      if (!p) continue;
-      const distances = arteryDistRef.current[artName];
-      for (let i = 0; i < p.count; i++) distances[i] = segmentContrastDistance(artName as ArterySegment, p.getX(i), p.getY(i), p.getZ(i), dominance);
-    }
     applyArteryColors(bolusAnimatingRef.current ? bolusProgressRef.current : 1.2);
-
   }, [
     modelGroup,
     activeCaseId,
@@ -650,6 +723,7 @@ function HeartSceneContent({
     timeline,
     reperfused,
     viewMode,
+    dominance,
     applyArteryColors,
   ]);
 
@@ -679,28 +753,30 @@ function HeartSceneContent({
 
   if (!modelGroup) return null;
 
+  const landmarkDefs = getHeartLandmarks(dominance);
+  const activeLandmarks = landmarksByDominance[dominance];
   const isLeftDominantNstemiInf =
     activeCaseId === 'nstemi_inf' && dominance === 'left';
   const replacedBaseMarkerId = isLeftDominantNstemiInf
     ? 'lcx'
-    : HEART_LANDMARKS[activeCaseId]?.replacesBaseMarker;
+    : landmarkDefs[activeCaseId]?.replacesBaseMarker;
   const lcxLandmark = isLeftDominantNstemiInf
-    ? landmarks.find((item) => item.caseId === 'lcx')
+    ? activeLandmarks.find((item) => item.caseId === 'lcx')
     : undefined;
 
   return (
     <group>
       <primitive object={modelGroup} />
 
-      {landmarks.map((lm) => {
+      {activeLandmarks.map((lm) => {
         const isActive = lm.caseId === activeCaseId;
         const isHovered = lm.caseId === hoveredCase;
         // Не дублируем маркеры, лежащие на том же участке сосуда, что и базовые STEMI-точки
-        if (HEART_LANDMARKS[lm.caseId]?.replacesBaseMarker && !isActive) return null;
+        if (landmarkDefs[lm.caseId]?.replacesBaseMarker && !isActive) return null;
         if (replacedBaseMarkerId && lm.caseId === replacedBaseMarkerId && !isActive) return null;
 
         const isLmcaOrLad =
-          isLeftCoronarySegment(HEART_LANDMARKS[lm.caseId]!.mesh) ||
+          isLeftCoronarySegment(landmarkDefs[lm.caseId]!.mesh) ||
           (lm.caseId === 'posterior' && dominance === 'left') ||
           (lm.caseId === 'nstemi_inf' && dominance === 'left');
         const visibleInAngio =
@@ -844,7 +920,7 @@ function HeartSceneContent({
               (labelMode === 'active' && (isActive || isHovered))) && (
               <ArteryLabel
                 worldPos={effectiveWorldPos}
-                text={`${ARTERY_LABELS[isActive && isLeftDominantNstemiInf ? 'LCx' : HEART_LANDMARKS[lm.caseId]!.mesh].shortRu}${angioStatusSuffix}`}
+                text={`${ARTERY_LABELS[isActive && isLeftDominantNstemiInf ? 'LCx' : landmarkDefs[lm.caseId]!.mesh].shortRu}${angioStatusSuffix}`}
                 className={`whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold shadow-md transition-colors ${
                   isActive
                     ? reperfused

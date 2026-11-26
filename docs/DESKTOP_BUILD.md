@@ -8,7 +8,7 @@ Electron сохраняется как текущая оболочка Windows. 
 
 ## 1. Архитектура десктопного запуска (`electron/main.cjs`)
 
-3D-модель сердца (`models/heart/heart_segmented.glb`) и бандлы Vite собираются с относительной базой (`base: './'`, `import.meta.env.BASE_URL`). При обычном открытии `dist/index.html` по протоколу `file://` запросы `fetch('./models/heart/...')` и ES-модули могут блокироваться политикой CORS браузера/Electron.
+3D-модели сердца (`models/heart/heart_segmented.glb` и `models/heart/heart_artery_left_type.glb`) и бандлы Vite собираются с относительной базой (`base: './'`, `import.meta.env.BASE_URL`). При обычном открытии `dist/index.html` по протоколу `file://` запросы `fetch('./models/heart/...')` и ES-модули могут блокироваться политикой CORS браузера/Electron.
 
 Для полностью автономной оффлайн-работы в [`electron/main.cjs`](../electron/main.cjs) используется собственный локальный протокол **`app://localhost/...`**:
 

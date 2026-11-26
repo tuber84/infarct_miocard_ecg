@@ -112,11 +112,11 @@
 
 ## 5. Как добавить новый клинический сценарий (OMI / мимик)
 
-Чтобы добавить новый паттерн (например, **критерии Sgarbossa / Smith** при БЛНПГ или **острый перикардит**), обновите 6 точек интеграции:
+Чтобы добавить новый паттерн (например, **критерии Sgarbossa / Smith** при БЛНПГ или **острый перикардит**), обновите точки интеграции:
 
 1. **`src/core/types.ts`:** добавьте идентификатор в `CaseId` и при необходимости новую форму сегмента ST в `StShape` или флаг в `LeadShiftProfile`.
-2. **`src/core/content/coronaryCases.ts`:** добавьте запись в `CORONARY_CASES` (указав `category`, `syndromeBadge`, `lesionType`, `urgencyLabel`, профили `leads`, `ahaSegments` и `clinicalInsights`) и включите ID в `CASE_ORDER`. Если поражение находится на сегменте существующего маркера — задайте `replacesBaseMarker` в `landmark`; для мимиков без окклюзии (`category: 'normal'` или мимик) оставьте `landmark` пустым.
-3. **`src/data/angiographyProjections.ts`:** добавьте запись в `CASE_OPTIMAL_PROJECTION` для нового `CaseId` (проверяется компилятором `Record<CaseId, ...>`).
-4. **`src/components/Heart3D.tsx`:** при наличии коронарного бассейна добавьте новый `CaseId` в `LCA_CASE_SET` (если относится к ЛКА) и в `switch` внутри `isVertexDistalToOcclusion()`.
-5. **`src/App.tsx`:** включите новый ID в `STEMI_CASES` или `NSTEMI_CASES` и задайте короткое имя в `CHIP_LABELS` (а также `defaultMonitorLead`, если нужно специфичное отведение по умолчанию).
+2. **`src/core/content/coronaryCases.ts`:** добавьте запись в `CORONARY_CASES` (указав `category`, `syndromeBadge`, `lesionType`, `urgencyLabel`, профили `leads`, `ahaSegments` и `clinicalInsights`) и включите ID в `CASE_ORDER`.
+3. **`src/presentation/heartLandmarks.ts` и `src/presentation/segmentedHeart.ts`:** при наличии коронарного поражения добавьте привязку маркера в `buildHeartLandmarks()` (`src/presentation/heartLandmarks.ts`, при необходимости с `replacesBaseMarker`) и список поражённых сегментов в `affectedArterySegments()` (`src/presentation/segmentedHeart.ts`); при необходимости обновите подписи в `src/presentation/arteryLabels.ts`. Для мимиков без окклюзии оставьте маркер и список сегментов пустыми.
+4. **`src/data/angiographyProjections.ts`:** добавьте запись в `CASE_OPTIMAL_PROJECTION` для нового `CaseId` (проверяется компилятором `Record<CaseId, ...>`).
+5. **`src/components/AtlasView.tsx`:** включите новый ID в `STEMI_CASES` или `NSTEMI_CASES` и задайте короткое имя в `CHIP_LABELS` (а также `defaultMonitorLead`, если нужно специфичное отведение по умолчанию).
 6. **`src/core/ecg/ecgEngine.ts` и `src/core/ecg/localizer.ts` (опционально):** при нестандартной морфологии QRS/ST-T обновите `sampleBeatMv()` и `getLeadBadge()`, а при необходимости — усилители в `localizeFromManualLeads()`.
