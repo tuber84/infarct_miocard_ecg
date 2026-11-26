@@ -828,8 +828,8 @@ function HeartSceneContent({
                 args={[
                   viewMode === 'angio'
                     ? isActive
-                      ? 0.046
-                      : 0.034
+                      ? 0.05
+                      : 0.038
                     : isActive
                       ? 0.055
                       : 0.042,
@@ -846,9 +846,9 @@ function HeartSceneContent({
                         ? '#f59e0b'
                         : '#ef4444'
                     : isHovered
-                      ? '#fbbf24'
+                      ? '#facc15'
                       : viewMode === 'angio'
-                        ? '#0284c7'
+                        ? '#00f0ff'
                         : '#ffffff'
                 }
                 emissive={
@@ -859,23 +859,22 @@ function HeartSceneContent({
                         ? '#d97706'
                         : '#dc2626'
                     : isHovered
-                      ? '#d97706'
+                      ? '#eab308'
                       : viewMode === 'angio'
-                        ? '#0369a1'
+                        ? '#00b4d8'
                         : '#475569'
                 }
                 emissiveIntensity={
                   isActive
-                    ? 1.2
+                    ? 1.3
                     : isHovered
-                      ? 0.95
+                      ? 1.1
                       : viewMode === 'angio'
-                        ? 0.75
+                        ? 0.95
                         : 0.45
                 }
-                roughness={0.2}
-                transparent={viewMode === 'angio' && !isActive ? true : false}
-                opacity={viewMode === 'angio' && !isActive ? 0.92 : 1}
+                roughness={0.15}
+                metalness={0.1}
               />
             </mesh>
 
@@ -939,7 +938,7 @@ function HeartSceneContent({
                         ? 'border border-amber-400 bg-amber-950/95 text-amber-100'
                         : 'border border-red-400 bg-red-950/95 text-amber-100'
                     : viewMode === 'angio'
-                      ? 'border border-sky-500/40 bg-slate-900/92 text-sky-100'
+                      ? 'border border-cyan-400/60 bg-slate-950/95 text-cyan-200'
                       : 'border border-slate-300 bg-white/95 text-slate-800'
                 }`}
               />
