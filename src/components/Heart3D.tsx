@@ -828,8 +828,8 @@ function HeartSceneContent({
                 args={[
                   viewMode === 'angio'
                     ? isActive
-                      ? 0.036
-                      : 0.028
+                      ? 0.046
+                      : 0.034
                     : isActive
                       ? 0.055
                       : 0.042,
@@ -846,9 +846,9 @@ function HeartSceneContent({
                         ? '#f59e0b'
                         : '#ef4444'
                     : isHovered
-                      ? '#f59e0b'
+                      ? '#fbbf24'
                       : viewMode === 'angio'
-                        ? '#64748b'
+                        ? '#0284c7'
                         : '#ffffff'
                 }
                 emissive={
@@ -859,13 +859,23 @@ function HeartSceneContent({
                         ? '#d97706'
                         : '#dc2626'
                     : isHovered
-                      ? '#ca8a04'
-                      : '#475569'
+                      ? '#d97706'
+                      : viewMode === 'angio'
+                        ? '#0369a1'
+                        : '#475569'
                 }
-                emissiveIntensity={isActive ? 1.2 : 0.45}
-                roughness={0.25}
-                transparent={viewMode === 'angio' && !isActive}
-                opacity={viewMode === 'angio' && !isActive ? 0.45 : 1}
+                emissiveIntensity={
+                  isActive
+                    ? 1.2
+                    : isHovered
+                      ? 0.95
+                      : viewMode === 'angio'
+                        ? 0.75
+                        : 0.45
+                }
+                roughness={0.2}
+                transparent={viewMode === 'angio' && !isActive ? true : false}
+                opacity={viewMode === 'angio' && !isActive ? 0.92 : 1}
               />
             </mesh>
 
@@ -885,18 +895,18 @@ function HeartSceneContent({
                 )}
                 <mesh ref={ringRef}>
                   <torusGeometry
-                    args={[viewMode === 'angio' ? 0.075 : 0.095, 0.011, 12, 32]}
+                    args={[viewMode === 'angio' ? 0.082 : 0.095, 0.011, 12, 32]}
                   />
                   <meshBasicMaterial
                     color={
                       isNonOcclusiveActive
                         ? '#f59e0b'
                         : viewMode === 'angio'
-                          ? '#dc2626'
+                          ? '#ef4444'
                           : '#fbbf24'
                     }
                     transparent
-                    opacity={0.75}
+                    opacity={0.8}
                   />
                 </mesh>
               </>
@@ -929,7 +939,7 @@ function HeartSceneContent({
                         ? 'border border-amber-400 bg-amber-950/95 text-amber-100'
                         : 'border border-red-400 bg-red-950/95 text-amber-100'
                     : viewMode === 'angio'
-                      ? 'border border-slate-600 bg-slate-900/92 text-slate-100'
+                      ? 'border border-sky-500/40 bg-slate-900/92 text-sky-100'
                       : 'border border-slate-300 bg-white/95 text-slate-800'
                 }`}
               />
