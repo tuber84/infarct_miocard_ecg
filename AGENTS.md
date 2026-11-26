@@ -82,7 +82,7 @@
 - Каждая карточка отведения **должна** оставаться отдельным компонентом (`<LeadCard />`). Нарушение этого правила уже вызывало падение React (`Rendered more hooks than during the previous render`) при переключении с `lad_prox` на `rca_prox`.
 
 ### B. Загрузка `heart_segmented.glb` и `heart_artery_left_type.glb` (`Heart3D.tsx`)
-- Текущие модели — `public/models/heart/heart_segmented.glb` (правый тип: `heart_body` + 13 артерий, 90 234 треугольника) и `public/models/heart/heart_artery_left_type.glb` (левый тип: 13 артерий, 42 090 треугольников). `GLTFLoader` загружает оба файла один раз через `${import.meta.env.BASE_URL}models/heart/...`; цвета сохранены в `COLOR_0`. Старые `heart_optimized.glb` и `heart_diffuse.webp` — архивные ассеты.
+- Текущие модели — `public/models/heart/heart_segmented.glb` (правый тип: `heart_body` + 13 артерий, 90 234 треугольника) и `public/models/heart/heart_artery_left_type.glb` (левый тип: 13 артерий, 38 974 треугольника). `GLTFLoader` загружает оба файла один раз через `${import.meta.env.BASE_URL}models/heart/...`; цвета сохранены в `COLOR_0`. Старые `heart_optimized.glb` и `heart_diffuse.webp` — архивные ассеты.
 - **Не передавать изменяемые при вращении камеры значения, например `liveAngles`, в `<HeartCanvasViewport>`**; стабилизировать `onLoaded` через ref, чтобы поворот С-дуги не перезапускал загрузку или ререндер Canvas.
 
 ### C. Координаты модели и маркеры
