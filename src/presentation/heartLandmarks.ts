@@ -47,6 +47,11 @@ function buildHeartLandmarks(geom: SegmentGeometryMap): Partial<Record<CaseId, O
       localPos: [...geom.RCA_dist.marker],
       vesselRegion: 'rca_dist',
     },
+    pda: {
+      mesh: 'PDA',
+      localPos: [...geom.PDA.marker],
+      vesselRegion: 'pda',
+    },
     lcx: {
       mesh: 'LCx',
       localPos: [...geom.LCx.marker],

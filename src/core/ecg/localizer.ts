@@ -160,6 +160,24 @@ export function localizeFromManualLeads(
     ) {
       score += 2.8;
     }
+    // Изолированный нижний ИМ (ЗМЖВ / PDA): нижний подъём без вовлечения ПЖ, V1–V3↓, передних и боковых отведений
+    if (
+      caseId === 'pda' &&
+      (steSet.has('II') || steSet.has('III')) &&
+      steSet.has('aVF') &&
+      !steSet.has('V4R') &&
+      !steSet.has('V3R') &&
+      !steSet.has('V1') &&
+      !steSet.has('V3') &&
+      !steSet.has('V4') &&
+      !stdSet.has('V1') &&
+      !stdSet.has('V2') &&
+      !stdSet.has('V3') &&
+      !steSet.has('V5') &&
+      !steSet.has('V6')
+    ) {
+      score += 1.6;
+    }
     // ОВ (II/III/aVF + боковые V5/V6/I/aVL без депрессии в aVL)
     if (
       caseId === 'lcx' &&

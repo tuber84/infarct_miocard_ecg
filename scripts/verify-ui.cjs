@@ -51,7 +51,13 @@ app.whenReady().then(async () => {
       check(text().includes('Дистальный сегмент ПМЖВ (LAD)'), 'Нет правильного названия дистального сегмента');
       check(text().includes('ПМЖВ дист. (LAD)'), 'Нет подписи дистального сегмента на 3D-модели');
       check(!text().includes('Длинная ПМЖВ'), 'Осталось прежнее название случая');
-      for (const label of ['ПКА прокс.', 'ПМЖВ прокс.', 'ОВ / ВТК', 'Задний ИМ', 'ПМЖВ прокс.']) await click(label);
+      for (const label of ['ПКА прокс.', 'ЗМЖВ (PDA)', 'ОВ / ВТК', 'Задний ИМ', 'ПМЖВ прокс.']) await click(label);
+      await click('ЗМЖВ (PDA)');
+      check(text().includes('Задняя межжелудочковая ветвь ПКА'), 'Нет правого бассейна ЗМЖВ');
+      await click('Левый тип');
+      check(text().includes('Задняя межжелудочковая ветвь ОВ'), 'Не переключился бассейн ЗМЖВ при левом типе');
+      await click('Правый тип');
+      await click('ПМЖВ прокс.');
       await click('ОКСбпST / паттерны');
       for (const label of ['ИМбпST нижн.', 'Велленс A', 'Велленс B', 'де Винтер', 'Ствол ЛКА']) await click(label);
       await click('ИМпST (STEMI)');

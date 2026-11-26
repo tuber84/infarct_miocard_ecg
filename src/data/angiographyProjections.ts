@@ -313,9 +313,9 @@ export const CASE_OPTIMAL_PROJECTION: Record<CaseId, CaseOptimalProjection> = {
     reason: 'Выводит ОВ (LCx) и ветви тупого края (OM) без проекционного укорочения',
   },
   posterior: {
-    projectionId: 'rao_caudal',
-    system: 'BOTH',
-    reason: 'Раскрывает дистальную ОВ и заднебоковые ветви задней стенки',
+    projectionId: 'lao_cranial_rca',
+    system: 'RCA',
+    reason: 'Раскрывает бифуркацию crux cordis и заднебоковую ветвь (ЗБВ / PLB) доминантной ПКА',
   },
   rca_prox: {
     projectionId: 'lao_rca',
@@ -326,6 +326,11 @@ export const CASE_OPTIMAL_PROJECTION: Record<CaseId, CaseOptimalProjection> = {
     projectionId: 'lao_cranial_rca',
     system: 'RCA',
     reason: 'Раскрывает дистальную ПКА в области crux cordis (PDA + PLB)',
+  },
+  pda: {
+    projectionId: 'rao_rca',
+    system: 'RCA',
+    reason: 'Выводит ЗМЖВ (PDA) по всей длине в задней межжелудочковой борозде без укорочения',
   },
   nstemi_antlat: {
     projectionId: 'rao_cranial',
@@ -363,12 +368,28 @@ export function getOptimalProjectionForCase(
   caseId: CaseId,
   dominance: Dominance
 ): CaseOptimalProjection {
-  if (caseId === 'nstemi_inf' && dominance === 'left') {
-    return {
-      projectionId: 'rao_caudal',
-      system: 'LCA',
-      reason: 'Раскрывает доминантную ОВ (LCx) и ВТК при левом типе кровоснабжения',
-    };
+  if (dominance === 'left') {
+    if (caseId === 'pda') {
+      return {
+        projectionId: 'lao_cranial',
+        system: 'LCA',
+        reason: 'Раскрывает терминальную ОВ и ход ЗМЖВ (PDA, сегмент 15 SYNTAX) в задней МЖ-борозде',
+      };
+    }
+    if (caseId === 'posterior') {
+      return {
+        projectionId: 'rao_caudal',
+        system: 'LCA',
+        reason: 'Раскрывает доминантную ОВ и заднебоковую ветвь ЛЖ (ЗБВ / PLB, сегмент 14 SYNTAX)',
+      };
+    }
+    if (caseId === 'nstemi_inf') {
+      return {
+        projectionId: 'rao_caudal',
+        system: 'LCA',
+        reason: 'Раскрывает доминантную ОВ (LCx) и ВТК при левом типе кровоснабжения',
+      };
+    }
   }
   return CASE_OPTIMAL_PROJECTION[caseId];
 }

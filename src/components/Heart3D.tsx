@@ -777,8 +777,8 @@ function HeartSceneContent({
 
         const isLmcaOrLad =
           isLeftCoronarySegment(landmarkDefs[lm.caseId]!.mesh) ||
-          (lm.caseId === 'posterior' && dominance === 'left') ||
-          (lm.caseId === 'nstemi_inf' && dominance === 'left');
+          ((lm.caseId === 'posterior' || lm.caseId === 'pda' || lm.caseId === 'nstemi_inf') &&
+            dominance === 'left');
         const visibleInAngio =
           angioSystem === 'BOTH' ||
           (angioSystem === 'LCA' && isLmcaOrLad) ||

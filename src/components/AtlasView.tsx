@@ -38,6 +38,7 @@ const STEMI_CASES: CaseId[] = [
   'd1',
   'rca_prox',
   'rca_dist',
+  'pda',
   'lcx',
   'posterior',
 ];
@@ -59,6 +60,7 @@ const CHIP_LABELS: Partial<Record<CaseId, string>> = {
   d1: 'ДВ1 (D1)',
   rca_prox: 'ПКА прокс.',
   rca_dist: 'ПКА дист.',
+  pda: 'ЗМЖВ (PDA)',
   lcx: 'ОВ / ВТК',
   posterior: 'Задний ИМ',
   nstemi_antlat: 'ИМбпST передн.',
@@ -192,7 +194,7 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
 
   // Отведение по умолчанию для монитора реального времени
   const defaultMonitorLead: LeadId = useMemo(() => {
-    if (effectiveCaseId === 'rca_prox' || effectiveCaseId === 'rca_dist') return 'III';
+    if (effectiveCaseId === 'rca_prox' || effectiveCaseId === 'rca_dist' || effectiveCaseId === 'pda') return 'III';
     if (effectiveCaseId === 'nstemi_inf') return 'II';
     if (effectiveCaseId === 'lcx' || effectiveCaseId === 'nstemi_antlat') return 'V5';
     if (effectiveCaseId === 'nstemi_tinv') return 'V4';
@@ -471,7 +473,7 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
                     )}
                   </span>
                   <h2 className="mt-0.5 text-base font-extrabold leading-snug text-slate-900">
-                    {manualMode ? (hasManualHypothesis ? resolvedCase.caseData.shortTitle : 'Паттерн пока не определён') : resolvedCase.caseData.arteryName}
+                    {manualMode ? (hasManualHypothesis ? resolvedCase.caseData.shortTitle : 'Паттерн пока не определён') : resolvedCase.arteryName}
                   </h2>
                   <p
                     className={`text-xs font-semibold ${
@@ -482,14 +484,14 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
                           : 'text-amber-800'
                     }`}
                   >
-                    {manualMode ? 'Проверьте амплитуды, форму ST/T и динамику.' : resolvedCase.caseData.segmentLabel}
+                    {manualMode ? 'Проверьте амплитуды, форму ST/T и динамику.' : resolvedCase.segmentLabel}
                   </p>
                 </div>
 
               </div>
 
               <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                {manualMode ? 'Сопоставление с учебными примерами по отмеченным ST↑ / ST↓ / T↓. Цветовые отметки сами по себе не подтверждают диагностические критерии.' : resolvedCase.caseData.description}
+                {manualMode ? 'Сопоставление с учебными примерами по отмеченным ST↑ / ST↓ / T↓. Цветовые отметки сами по себе не подтверждают диагностические критерии.' : resolvedCase.description}
               </p>
 
               {/* Обоснование локализатора и рекомендации в ручном режиме */}
@@ -561,7 +563,7 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
             {hasManualHypothesis && <AhaBullseye
               ahaSegments={resolvedCase.ahaSegments}
               rvInvolved={resolvedCase.rvInvolved}
-              reciprocalSegments={resolvedCase.caseData.reciprocalSegments}
+              reciprocalSegments={resolvedCase.reciprocalSegments}
               dominance={dominance}
               reperfused={reperfused}
               timeline={timeline}
@@ -611,8 +613,8 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
         {hasManualHypothesis && <ClinicalInsights
           caseId={effectiveCaseId}
           manualMode={manualMode}
-          arteryName={resolvedCase.caseData.arteryName}
-          segmentLabel={resolvedCase.caseData.segmentLabel}
+          arteryName={resolvedCase.arteryName}
+          segmentLabel={resolvedCase.segmentLabel}
           territoryName={resolvedCase.territoryName}
           insights={resolvedCase.caseData.clinicalInsights}
         />}

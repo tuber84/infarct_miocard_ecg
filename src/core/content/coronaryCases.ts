@@ -332,28 +332,32 @@ export const CORONARY_CASES: Record<CaseId, CoronaryCase> = {
       V4R: { stMm: 2.3, shape: 'convex', hyperacuteT: 0.7, qPotential: 0.6 },
     },
     leftDominanceOverride: {
-      ahaSegments: [3],
+      replaceLeads: true,
+      segmentLabel: 'Проксимальный сегмент гипопластичной ПКА (RCA) при левом типе кровоснабжения',
+      description:
+        'Клинический хамелеон левого типа кровоснабжения: окклюзия проксимальной недоразвитой ПКА вызывает изолированный инфаркт правого желудочка без классического нижнего ИМ ЛЖ — подъём ST в V1 и V3R–V4R (иногда псевдо-передний в V1–V2) при минимальных изменениях в II, III, aVF.',
+      ahaSegments: [],
       rvInvolved: true,
-      territoryNote: 'Преимущественно инфаркт правого желудочка (левый тип кровоснабжения: нижняя стенка ЛЖ питается от ОВ)',
+      reciprocalSegments: [],
+      territoryNote: 'Изолированный инфаркт правого желудочка (левый тип: нижняя стенка ЛЖ полностью питается от ОВ)',
       leads: {
-        III: { stMm: 1.0, shape: 'concave' },
-        aVF: { stMm: 0.6, shape: 'normal' },
-        II: { stMm: 0.3, shape: 'normal' },
-        aVL: { stMm: -0.7, shape: 'horizontal', isReciprocal: true },
-        I: { stMm: -0.4, shape: 'normal' },
-        V1: { stMm: 1.6, shape: 'convex', hyperacuteT: 0.5 },
-        V2: { stMm: 0.8, shape: 'concave' },
-        V3R: { stMm: 1.9, shape: 'convex', hyperacuteT: 0.6, qPotential: 0.5 },
-        V4R: { stMm: 2.5, shape: 'convex', hyperacuteT: 0.8, qPotential: 0.65 },
+        III: { stMm: 0.7, shape: 'concave' },
+        aVF: { stMm: 0.4, shape: 'normal' },
+        II: { stMm: 0.2, shape: 'normal' },
+        aVL: { stMm: -0.5, shape: 'normal' },
+        V1: { stMm: 1.8, shape: 'convex', hyperacuteT: 0.55 },
+        V2: { stMm: 1.0, shape: 'concave', hyperacuteT: 0.3 },
+        V3R: { stMm: 2.0, shape: 'convex', hyperacuteT: 0.65, qPotential: 0.55 },
+        V4R: { stMm: 2.6, shape: 'convex', hyperacuteT: 0.8, qPotential: 0.65 },
       },
     },
     defaultHeartRate: 54,
     recommendedExtraLeads: ['V3R', 'V4R'],
     clinicalInsights: {
       ecgCriteria: [
-        'Подъём ST в III > II (классический критерий ПКА: вектор направлен вниз и вправо, ближе к +120° оси отведения III).',
-        'Выраженная реципрокная депрессия в aVL и I (в aVL почти всегда глубже, чем в I).',
-        'Признак проксимальной окклюзии с ИМ правого желудочка: подъём ST в V1 (при депрессии в V2!) и подъём ST в V4R ≥ 1.0 мм.',
+        'При правом типе: подъём ST в III > II (вектор направлен вниз и вправо, ближе к +120° оси отведения III) с реципрокной депрессией в aVL > I.',
+        'Признак проксимальной окклюзии с ИМ правого желудочка: подъём ST в V1 (при депрессии в V2 при правом типе) и подъём ST в V4R ≥ 1.0 мм.',
+        'При левом типе кровоснабжения (гипопластичная ПКА): развивается изолированный ИМ ПЖ — подъём ST в V1, V3R–V4R (иногда до V2) почти без элевации ST в II, III, aVF, что может имитировать передне-перегородочный STEMI.',
       ],
       reciprocalAndExtra: [
         'Обязательно снимите правые грудные отведения (V3R, V4R) в первые часы — элевация в V4R очень чувствительна к окклюзии ПКА до ветви ПЖ, но может быстро регрессировать за 10–12 часов.',
@@ -397,34 +401,113 @@ export const CORONARY_CASES: Record<CaseId, CoronaryCase> = {
       V4R: { stMm: 0.2, shape: 'normal' },
     },
     leftDominanceOverride: {
-      ahaSegments: [15],
+      replaceLeads: true,
+      segmentLabel: 'Дистальная терминальная ветвь гипопластичной ПКА на стенке ПЖ (левый тип)',
+      description:
+        'При левом типе кровоснабжения гипопластичная ПКА заканчивается на стенке правого желудочка, не доходя до crux cordis и не отдавая ЗМЖВ/ЗБВ. Дистальная окклюзия затрагивает лишь малый участок ПЖ без нижнего ИМ ЛЖ.',
+      ahaSegments: [],
       rvInvolved: false,
-      territoryNote: 'Малый бассейн дистальной гипопластичной ПКА (левый тип: основную нижнюю стенку кровоснабжает ОВ)',
+      reciprocalSegments: [],
+      territoryNote: 'Локальный участок стенки ПЖ без вовлечения ЛЖ (при левом типе ПКА не доходит до crux cordis)',
       leads: {
-        III: { stMm: 0.9, shape: 'concave' },
-        aVF: { stMm: 0.7, shape: 'concave' },
-        II: { stMm: 0.5, shape: 'normal' },
-        aVL: { stMm: -0.6, shape: 'horizontal', isReciprocal: true },
+        III: { stMm: 0.6, shape: 'concave' },
+        aVF: { stMm: 0.4, shape: 'normal' },
+        V1: { stMm: 0.5, shape: 'concave' },
+        V4R: { stMm: 0.8, shape: 'concave' },
+        aVL: { stMm: -0.4, shape: 'normal' },
       },
     },
     defaultHeartRate: 62,
     recommendedExtraLeads: ['V4R', 'V7', 'V8', 'V9'],
     clinicalInsights: {
       ecgCriteria: [
-        'Классический критерий ПКА: ST↑ в III > II и ST↓ в aVL глубже, чем в I.',
+        'Классический критерий доминантной ПКА: ST↑ в III > II и ST↓ в aVL глубже, чем в I.',
         'В отличие от проксимальной окклюзии, отведения V1 и V4R не имеют значимого подъёма ST (ветвь ПЖ кровоснабжается выше тромба).',
-        'При наличии депрессии в V1–V3 проверьте задние отведения V7–V9 (вовлечение задне-базальной ветви ПКА).',
+        'Если ПКА закрыта до бифуркации crux cordis, одновременно выключаются ЗМЖВ (PDA) и ЗБВ (PLB) — к нижнему подъёму присоединяется депрессия в V1–V3 и подъём в V7–V9.',
       ],
       reciprocalAndExtra: [
         'Реципрокная депрессия в aVL является самым ранним и чувствительным маркером нижнего ИМ — иногда появляется раньше чёткого подъёма в III/aVF.',
       ],
       cathLabRisks: [
-        'Контроль бифуркации ЗМЖВ (PDA) и задне-боковой ветви (PLV) в проекциях LAO Cranial и RAO.',
+        'Контроль бифуркации ЗМЖВ (PDA) и заднебоковой ветви (ЗБВ / PLB) в проекциях LAO Cranial и RAO.',
         'Возможны транзиторные АВ-блокады, которые обычно быстро разрешаются после восстановления кровотока TIMI 3.',
       ],
       mimics: [
-        'Окклюзия ОВ при правом/левом типе (при ОВ обычно ST↑ в II ≥ III, отсутствует депрессия в I/aVL или есть подъём в I, aVL, V5–V6).',
+        'Изолированная окклюзия ЗМЖВ (PDA) от терминальной ОВ при левом типе кровоснабжения (даёт схожий чистый нижний STEMI с aVL↓ при интактной гипопластичной ПКА на КАГ!).',
         'Острая патология ЖКТ / перикардит (нет реципрокной депрессии в aVL).',
+      ],
+    },
+  },
+
+  pda: {
+    id: 'pda',
+    category: 'stemi',
+    syndromeBadge: 'ИМпST (STEMI)',
+    lesionType: 'occlusion',
+    urgencyLabel: 'Немедленная реперфузионная стратегия',
+    shortTitle: 'ЗМЖВ (PDA) — изолированный нижний ИМ',
+    arteryName: 'Задняя межжелудочковая ветвь ПКА (ЗМЖВ / PDA)',
+    segmentLabel: 'Устье / проксимальный сегмент ЗМЖВ (PDA, сегмент 4 SYNTAX) от дистальной ПКА',
+    territoryName: 'Нижняя стенка и нижняя треть МЖП (ЗБВ и ПЖ сохранены)',
+    isPathological: true,
+    description:
+      'Изолированная окклюзия задней межжелудочковой ветви (ЗМЖВ / PDA) в задней МЖ-борозде. Даёт «чистый» нижний ИМпST без вовлечения правого желудочка (V4R на изолинии) и без выраженного задне-бокового компонента (ЗБВ / PLB открыта).',
+    ahaSegments: [4, 9, 10, 15],
+    rvInvolved: false,
+    reciprocalSegments: [1, 6],
+    leads: {
+      III: { stMm: 2.7, shape: 'convex', hyperacuteT: 0.9, qPotential: 0.85, rLoss: 0.6 },
+      aVF: { stMm: 2.3, shape: 'convex', hyperacuteT: 0.8, qPotential: 0.8, rLoss: 0.55 },
+      II: { stMm: 1.8, shape: 'convex', hyperacuteT: 0.65, qPotential: 0.6, rLoss: 0.45 },
+      aVL: { stMm: -1.8, shape: 'horizontal', isReciprocal: true },
+      I: { stMm: -0.9, shape: 'horizontal', isReciprocal: true },
+      V4R: { stMm: 0.1, shape: 'normal' },
+      V7: { stMm: 0.2, shape: 'normal' },
+      V8: { stMm: 0.2, shape: 'normal' },
+      V9: { stMm: 0.1, shape: 'normal' },
+    },
+    leftDominanceOverride: {
+      replaceLeads: true,
+      arteryName: 'Задняя межжелудочковая ветвь ОВ (ЗМЖВ / PDA)',
+      segmentLabel: 'Терминальная ветвь доминантной ОВ (LCx → PDA, сегмент 15 SYNTAX) у crux cordis',
+      description:
+        'ЭКГ-ловушка левого типа кровоснабжения: изолированная окклюзия ЗМЖВ (PDA), отходящей от терминальной ОВ (сегмент 15 SYNTAX). Так как ветви тупого края (OM1) и ЗБВ (PLB) проходимы, боковая стенка не вовлечена — на ЭКГ регистрируется чистый нижний ИМпST с реципрокной депрессией в aVL (II ≈ III), имитирующий дистальную ПКА!',
+      ahaSegments: [4, 9, 10, 15],
+      rvInvolved: false,
+      reciprocalSegments: [1, 6],
+      territoryNote: 'Нижняя стенка и нижняя треть МЖП из бассейна доминантной ОВ (левый тип кровоснабжения)',
+      leads: {
+        II: { stMm: 2.4, shape: 'convex', hyperacuteT: 0.85, qPotential: 0.8, rLoss: 0.55 },
+        aVF: { stMm: 2.4, shape: 'convex', hyperacuteT: 0.85, qPotential: 0.8, rLoss: 0.55 },
+        III: { stMm: 2.3, shape: 'convex', hyperacuteT: 0.8, qPotential: 0.75, rLoss: 0.5 },
+        aVL: { stMm: -1.4, shape: 'horizontal', isReciprocal: true },
+        I: { stMm: -0.5, shape: 'horizontal', isReciprocal: true },
+        V4R: { stMm: 0.0, shape: 'normal' },
+        V7: { stMm: 0.3, shape: 'normal' },
+        V8: { stMm: 0.2, shape: 'normal' },
+        V9: { stMm: 0.1, shape: 'normal' },
+      },
+    },
+    defaultHeartRate: 64,
+    recommendedExtraLeads: ['V3R', 'V4R', 'V7', 'V8', 'V9'],
+    clinicalInsights: {
+      ecgCriteria: [
+        'Изолированный нижний подъём ST (II, III, aVF) с реципрокной депрессией в aVL без элевации в V5–V6 и без глубокой зеркальной депрессии в V1–V3 (так как ЗБВ / PLB проходима).',
+        'При правом типе преобладает ST↑ III > II; при левом типе (ЗМЖВ от ОВ) вектор направлен почти вертикально вниз (II ≈ III), но сохраняется реципрокная депрессия в aVL, маскируя бассейн ОВ под ПКА!',
+        'Формирование патологических Q в III и aVF при задержке реперфузии при сохранённом R в V1–V2.',
+      ],
+      reciprocalAndExtra: [
+        'V3R–V4R на изолинии (ветви правого желудочка отходят проксимально от ПКА и не затронуты).',
+        'V7–V9 без диагностического подъёма ST ≥ 0,5 мм — главное отличие изолированной окклюзии ЗМЖВ (PDA) от окклюзии ЗБВ (PLB) или ствола дистальной ПКА/ОВ до бифуркации.',
+      ],
+      cathLabRisks: [
+        'Ловушка левого типа (~8–10% пациентов): при чистом нижнем STEMI селективная КАГ выявляет тонкую интактную гипопластичную ПКА, не доходящую до crux cordis. Обязательно сразу переходите на ЛКА — тромб находится в терминальной ОВ / устье ЗМЖВ (сегмент 15 SYNTAX).',
+        'В области crux cordis у начала ЗМЖВ часто отходит артерия АВ-узла (от ПКА при правом типе, от ОВ — при левом) — готовность к транзиторной АВ-блокаде и брадикардии на реперфузии.',
+        'Оптимальные ракурсы: при правом типе — RAO (ПКА) по длине ЗМЖВ и LAO Cranial (Crux); при левом типе — LAO Cranial и RAO Caudal на ЛКА.',
+      ],
+      mimics: [
+        'Окклюзия дистальной ПКА до бифуркации креста сердца (чаще даёт сопутствующую депрессию V1–V3 и подъём V7–V9 за счёт выключения ЗБВ / PLB).',
+        'Дистальная ПМЖВ с переходом за верхушку (сочетается с ярким подъёмом ST в V2–V5).',
       ],
     },
   },
@@ -461,8 +544,11 @@ export const CORONARY_CASES: Record<CaseId, CoronaryCase> = {
       V9: { stMm: 1.7, shape: 'convex', hyperacuteT: 0.6, qPotential: 0.55, rLoss: 0.4 },
     },
     leftDominanceOverride: {
-      ahaSegments: [4, 5, 6, 10, 11, 12, 15, 16],
-      territoryNote: 'Обширный нижне-задне-боковой бассейн ЛЖ (доминантная ОВ при левом типе кровоснабжения)',
+      replaceLeads: true,
+      arteryName: 'Доминантная огибающая ветвь (ОВ / LCx) — проксимальная окклюзия',
+      segmentLabel: 'Проксимальная доминантная ОВ (до отхождения ВТК1, ЗБВ и ЗМЖВ)',
+      ahaSegments: [3, 4, 5, 6, 9, 10, 11, 12, 15, 16],
+      territoryNote: 'Обширный нижне-задне-боковой бассейн ЛЖ + нижняя МЖП (доминантная ОВ при левом типе)',
       leads: {
         II: { stMm: 3.0, shape: 'convex', hyperacuteT: 1.0, qPotential: 0.9, rLoss: 0.65 },
         III: { stMm: 2.4, shape: 'convex', hyperacuteT: 0.8, qPotential: 0.8, rLoss: 0.55 },
@@ -483,7 +569,7 @@ export const CORONARY_CASES: Record<CaseId, CoronaryCase> = {
     recommendedExtraLeads: ['V7', 'V8', 'V9'],
     clinicalInsights: {
       ecgCriteria: [
-        'Ключ к отличию от ПКА при нижнем подъёме ST: в отведении II элевация ≥ III (вектор уходит влево и вниз, к +60°).',
+        'Ключ к отличию проксимальной ОВ от ПКА при нижнем подъёме ST: в отведении II элевация ≥ III (суммарный вектор боковой и нижней стенок уходит влево и вниз, к +60°).',
         'Отведения I и aVL НЕ имеют реципрокной депрессии (изоэлектричны или с подъёмом ST), а V5–V6 показывают элевацию ST.',
         'Депрессия ST в V1–V3 отражает сопутствующий задний (нижне-базальный) компонент.',
       ],
@@ -491,11 +577,12 @@ export const CORONARY_CASES: Record<CaseId, CoronaryCase> = {
         'Обязательна запись V7–V9 по левому краю под углом лопатки: там часто регистрируется подъём ST ≥ 0.5–1.0 мм, даже если стандартные отведения выглядят скромно.',
       ],
       cathLabRisks: [
-        'При левом типе кровоснабжения проксимальная окклюзия ОВ ведёт к обширному поражению (задняя + боковая + нижняя стенки) и дисфункции папиллярных мышц с острой митральной регургитацией.',
+        'При левом типе кровоснабжения проксимальная окклюзия ОВ выключает боковую, заднюю и всю нижнюю стенку ЛЖ; заднемедиальная папиллярная мышца при левом типе лишена двойного питания — высокий риск острой тяжёлой митральной регургитации, отёка лёгких и шока.',
+        'При левом типе артерия АВ-узла отходит от дистальной ОВ в зоне crux cordis — возможны АВ-блокады II–III ст. (которые при правом типе типичны для ПКА).',
         'Оптимальные ангиографические проекции для ОВ и ВТК: RAO Caudal (30°/25°) и LAO Caudal (Паук).',
       ],
       mimics: [
-        'Дистальная окклюзия ПКА с вовлечением PLV.',
+        'Дистальная окклюзия ПКА с крупной ЗБВ (PLB).',
         'Передняя субэндокардиальная ишемия (при депрессии в V1–V3 без проверки V7–V9!).',
       ],
     },
@@ -508,12 +595,12 @@ export const CORONARY_CASES: Record<CaseId, CoronaryCase> = {
     lesionType: 'occlusion',
     urgencyLabel: 'Немедленная реперфузионная стратегия',
     shortTitle: 'Задний ИМ (заднебоковая ветвь — ЗБВ / PLB)',
-    arteryName: 'Заднебоковая ветвь (ЗБВ / PLB) ПКА (RCA) или ОВ (LCx)',
-    segmentLabel: 'Изолированная окклюзия заднебоковой ветви (ЗБВ / PLB)',
-    territoryName: 'Задняя (нижне-базальная) стенка ЛЖ',
+    arteryName: 'Заднебоковая ветвь ПКА (ЗБВ / PLB)',
+    segmentLabel: 'Изолированная окклюзия ЗБВ ПКА (PLB, сегмент 16 SYNTAX)',
+    territoryName: 'Задняя (нижне-базальная) стенка ЛЖ (ЗМЖВ открыта)',
     isPathological: true,
     description:
-      'Изолированный задний (нижне-базальный) ИМ. В классических 12 отведениях нет подъёма ST — видна лишь «зеркальная» горизонтальная депрессия в V1–V3 и высокий R!',
+      'Изолированный задний (нижне-базальный) ИМ при окклюзии ЗБВ (PLB) при сохранённом кровотоке по ЗМЖВ (PDA). В классических 12 отведениях нет выраженного подъёма ST — видна лишь «зеркальная» горизонтальная депрессия в V1–V3 и высокий R!',
     ahaSegments: [4, 5, 11],
     rvInvolved: false,
     reciprocalSegments: [2, 8],
@@ -527,20 +614,39 @@ export const CORONARY_CASES: Record<CaseId, CoronaryCase> = {
       V6: { stMm: 0.8, shape: 'concave' },
       II: { stMm: 0.6, shape: 'concave' },
     },
+    leftDominanceOverride: {
+      replaceLeads: true,
+      arteryName: 'Заднебоковая ветвь ОВ (ЗБВ / PLB)',
+      segmentLabel: 'Изолированная окклюзия ЗБВ ЛЖ от доминантной ОВ (PLB, сегмент 14 SYNTAX)',
+      territoryNote: 'Задняя (нижне-базальная и нижне-боковая) стенка ЛЖ из бассейна ОВ (ЗМЖВ открыта)',
+      ahaSegments: [4, 5, 11],
+      rvInvolved: false,
+      reciprocalSegments: [2, 8],
+      leads: {
+        V1: { stMm: -2.1, shape: 'horizontal', isReciprocal: true, tallRPosterior: true },
+        V2: { stMm: -2.7, shape: 'horizontal', isReciprocal: true, tallRPosterior: true },
+        V3: { stMm: -2.2, shape: 'horizontal', isReciprocal: true },
+        V7: { stMm: 2.4, shape: 'convex', hyperacuteT: 0.85, qPotential: 0.8, rLoss: 0.6 },
+        V8: { stMm: 2.5, shape: 'convex', hyperacuteT: 0.85, qPotential: 0.8, rLoss: 0.6 },
+        V9: { stMm: 2.1, shape: 'convex', hyperacuteT: 0.75, qPotential: 0.7, rLoss: 0.5 },
+        V6: { stMm: 1.0, shape: 'concave', hyperacuteT: 0.35 },
+        II: { stMm: 0.7, shape: 'concave' },
+      },
+    },
     defaultHeartRate: 85,
     recommendedExtraLeads: ['V7', 'V8', 'V9'],
     clinicalInsights: {
       ecgCriteria: [
-        'В 12 стандартных отведениях — НЕТ элевации ST! Главный сигнал тревоги: изолированная горизонтальная депрессия ST в V1–V3 (максимум в V2–V3).',
-        'Высокий R в V1–V2 может сопровождать задний ИМ. Его отсутствие не исключает поражение: оцените депрессию V1–V3, особенно с положительным T, и запишите V7–V9.',
+        'В 12 стандартных отведениях — НЕТ классической элевации ST! Главный сигнал тревоги: изолированная горизонтальная депрессия ST в V1–V3 (максимум в V2–V3).',
+        'В отличие от окклюзии ЗМЖВ (PDA), нижние отведения (II, III, aVF) спокойны или приподняты минимально (< 1 мм). Высокий R в V1–V2 поддерживает диагноз, но его отсутствие не исключает задний ИМ.',
         'Переверните плёнку обратной стороной на просвет: депрессия V1–V3 превратится в классический куполообразный STEMI.',
       ],
       reciprocalAndExtra: [
         'Запишите V7–V9 для выявления прямых признаков поражения задней стенки: диагностически значимый подъём ST ≥0,5 мм (0,05 мВ), согласно приложению А3 КР РФ по ОКСбпST.',
       ],
       cathLabRisks: [
-        'Самая частая причина ложной выписки или задержки КАГ («у пациента просто депрессия ST — лечим консервативно до утра»), хотя в реальности закрыта дистальная ОВ или крупная PLV.',
-        'Оцените дистальный бассейн ОВ (RAO Caudal) и PLV ПКА (LAO Cranial) на ангиографии.',
+        'Частая причина задержки КАГ («у пациента просто депрессия ST в V1–V3»), хотя закрыта крупная ЗБВ (PLB) от ПКА (правый тип) или от доминантной ОВ (левый тип, сегмент 14 SYNTAX) с риском ишемии заднемедиальной папиллярной мышцы.',
+        'На ангиографии: при правом типе оцените бифуркацию ПКА в LAO Cranial (Crux), при левом типе — дистальный бассейн ОВ в RAO Caudal.',
       ],
       mimics: [
         'Не-Q инфаркт / нестабильная стенокардия с передней депрессией (обычно захватывает V4–V6, не только V1–V3).',
@@ -688,6 +794,9 @@ export const CORONARY_CASES: Record<CaseId, CoronaryCase> = {
       aVL: { stMm: 0.3, shape: 'normal' },
     },
     leftDominanceOverride: {
+      replaceLeads: true,
+      arteryName: 'Доминантная огибающая ветвь (ОВ / LCx) — критический стеноз / субокклюзия',
+      segmentLabel: 'Субокклюзия доминантной ОВ с субэндокардиальной ишемией нижне-боковой стенки (TIMI 1–2)',
       ahaSegments: [4, 5, 10, 11, 12, 15, 16],
       rvInvolved: false,
       territoryNote:
@@ -713,6 +822,7 @@ export const CORONARY_CASES: Record<CaseId, CoronaryCase> = {
         },
         V5: { stMm: -1.7, shape: 'horizontal', isSubendocardial: true },
         V6: { stMm: -1.9, shape: 'downsloping', isSubendocardial: true },
+        aVL: { stMm: 0.2, shape: 'normal' },
       },
     },
     defaultHeartRate: 76,
@@ -955,6 +1065,7 @@ export const CASE_ORDER: CaseId[] = [
   'd1',
   'rca_prox',
   'rca_dist',
+  'pda',
   'lcx',
   'posterior',
   'nstemi_antlat',
@@ -969,9 +1080,13 @@ export const CASE_ORDER: CaseId[] = [
 
 export interface ResolvedCaseView {
   caseData: CoronaryCase;
+  arteryName: string;
+  segmentLabel: string;
+  description: string;
   leads: Partial<Record<LeadId, LeadShiftProfile>>;
   ahaSegments: number[];
   rvInvolved: boolean;
+  reciprocalSegments: number[];
   territoryName: string;
 }
 
@@ -984,17 +1099,29 @@ export function resolveCaseForDominance(
     const ov = base.leftDominanceOverride;
     return {
       caseData: base,
-      leads: ov.leads ? { ...base.leads, ...ov.leads } : base.leads,
+      arteryName: ov.arteryName ?? base.arteryName,
+      segmentLabel: ov.segmentLabel ?? base.segmentLabel,
+      description: ov.description ?? base.description,
+      leads: ov.leads
+        ? ov.replaceLeads
+          ? ov.leads
+          : { ...base.leads, ...ov.leads }
+        : base.leads,
       ahaSegments: ov.ahaSegments ?? base.ahaSegments,
       rvInvolved: ov.rvInvolved ?? base.rvInvolved,
+      reciprocalSegments: ov.reciprocalSegments ?? base.reciprocalSegments ?? [],
       territoryName: ov.territoryNote ?? base.territoryName,
     };
   }
   return {
     caseData: base,
+    arteryName: base.arteryName,
+    segmentLabel: base.segmentLabel,
+    description: base.description,
     leads: base.leads,
     ahaSegments: base.ahaSegments,
     rvInvolved: base.rvInvolved,
+    reciprocalSegments: base.reciprocalSegments ?? [],
     territoryName: base.territoryName,
   };
 }

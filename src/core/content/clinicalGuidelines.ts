@@ -12,7 +12,7 @@ export const RUSSIAN_GUIDELINES = {
   },
 } as const;
 
-const STEMI_IDS: CaseId[] = ['lad_prox', 'lad_mid', 'lad_wrap', 'd1', 'rca_prox', 'rca_dist', 'lcx', 'posterior'];
+const STEMI_IDS: CaseId[] = ['lad_prox', 'lad_mid', 'lad_wrap', 'd1', 'rca_prox', 'rca_dist', 'pda', 'lcx', 'posterior'];
 const NSTEMI_IDS: CaseId[] = ['nstemi_antlat', 'nstemi_inf', 'nstemi_tinv'];
 
 export function getClinicalGuidance(caseId: CaseId) {

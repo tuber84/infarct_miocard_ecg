@@ -15,10 +15,14 @@ const LEFT_PARENT = {
   PLB: 'LCx',
 };
 
+// Небольшое смещение маркеров терминальных ветвей от карины бифуркации, чтобы сферы ЗБВ (PLB) и ЗМЖВ (PDA) не накладывались.
+const RIGHT_MARKER_OFFSET = { PLB: 0.12, PDA: 0.28 };
+const LEFT_MARKER_OFFSET = { PLB: 0.12, PDA: 0.15 };
+
 const key = v => v.toArray().map(x => x.toFixed(6)).join(',');
 const mean = a => a.reduce((s, v) => s.add(v), new Vector3()).divideScalar(a.length);
 
-async function extractGeometry(glbPath, parentMap) {
+async function extractGeometry(glbPath, parentMap, markerOffsets = {}) {
   const file = fs.readFileSync(glbPath);
   const { scene } = await new GLTFLoader().parseAsync(
     file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength),
@@ -53,16 +57,37 @@ async function extractGeometry(glbPath, parentMap) {
       (best, v) => v.clone().sub(entry).dot(direction) > best.clone().sub(entry).dot(direction) ? v : best,
       p[0]
     );
-    // Маркер ставится на реальную вершину входного сечения сегмента.
-    const anchor = p.reduce(
-      (best, v) => v.distanceToSquared(entry) < best.distanceToSquared(entry) ? v : best,
-      p[0]
-    );
+    const frac = markerOffsets[name] ?? 0;
+    let anchor;
+    let markerTangent = direction;
+    if (frac > 0) {
+      const maxProj = Math.max(...p.map(v => v.clone().sub(entry).dot(direction)));
+      const sliceAt = f => p.filter(v => Math.abs(v.clone().sub(entry).dot(direction) - maxProj * f) < maxProj * 0.035);
+      const slice = sliceAt(frac);
+      const targetPt = slice.length ? mean(slice) : entry;
+      const pool = slice.length ? slice : p;
+      anchor = pool.reduce(
+        (best, v) => v.distanceToSquared(targetPt) < best.distanceToSquared(targetPt) ? v : best,
+        pool[0]
+      );
+      const prevSlice = sliceAt(Math.max(0.01, frac - 0.06));
+      const nextSlice = sliceAt(Math.min(0.95, frac + 0.06));
+      if (prevSlice.length && nextSlice.length) {
+        const localDir = mean(nextSlice).sub(mean(prevSlice));
+        if (localDir.lengthSq() > 1e-8) markerTangent = localDir.normalize();
+      }
+    } else {
+      // Маркер ставится на реальную вершину входного сечения сегмента.
+      anchor = p.reduce(
+        (best, v) => v.distanceToSquared(entry) < best.distanceToSquared(entry) ? v : best,
+        p[0]
+      );
+    }
     output[name] = {
       entry: entry.toArray(),
       end: end.toArray(),
       marker: anchor.toArray(),
-      tangent: direction.toArray(),
+      tangent: markerTangent.toArray(),
     };
   }
   return output;
@@ -71,8 +96,8 @@ async function extractGeometry(glbPath, parentMap) {
 const rightPath = process.argv[2] ?? 'public/models/heart/heart_segmented.glb';
 const leftPath = process.argv[3] ?? 'public/models/heart/heart_artery_left_type.glb';
 
-const rightGeometry = await extractGeometry(rightPath, RIGHT_PARENT);
-const leftGeometry = await extractGeometry(leftPath, LEFT_PARENT);
+const rightGeometry = await extractGeometry(rightPath, RIGHT_PARENT, RIGHT_MARKER_OFFSET);
+const leftGeometry = await extractGeometry(leftPath, LEFT_PARENT, LEFT_MARKER_OFFSET);
 
 const tsSource =
   '// Геометрические ориентиры из heart_segmented.glb (правый тип) и heart_artery_left_type.glb (левый тип); координаты исходного экспорта Houdini.\n' +

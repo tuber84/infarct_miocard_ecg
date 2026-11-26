@@ -13,6 +13,7 @@ require.extensions['.ts'] = (module, filename) => {
 
 const { localizeFromManualLeads: localize } = require('../src/core/ecg/localizer.ts');
 const { buildManualFallbackLeads } = require('../src/core/ecg/ecgEngine.ts');
+const { resolveCaseForDominance } = require('../src/core/content/coronaryCases.ts');
 
 for (const dominance of ['right', 'left']) {
   test(`Одиночный признак не определяет паттерн: ${dominance}`, () => {
@@ -72,4 +73,15 @@ test('Изолированная депрессия I и aVL не относит
     assert.equal(result.primaryCaseId, 'nstemi_antlat');
     assert.ok(result.reasoning.some((line) => line.includes('II, III, aVF')));
   }
+});
+
+test('Левый тип кровоснабжения разделяет ЗМЖВ/ЗБВ от ОВ и исключает сегменты ЛЖ у гипопластичной ПКА', () => {
+  assert.deepEqual(resolveCaseForDominance('rca_prox', 'left').ahaSegments, []);
+  assert.equal(resolveCaseForDominance('rca_prox', 'left').rvInvolved, true);
+  assert.deepEqual(resolveCaseForDominance('rca_dist', 'left').ahaSegments, []);
+  assert.ok(resolveCaseForDominance('pda', 'right').arteryName.includes('ПКА'));
+  assert.ok(resolveCaseForDominance('pda', 'left').arteryName.includes('ОВ'));
+  assert.ok(resolveCaseForDominance('posterior', 'left').arteryName.includes('ОВ'));
+  const pureInferiorLeft = localize({ II: 'ste', III: 'ste', aVF: 'ste', aVL: 'std' }, 'left');
+  assert.equal(pureInferiorLeft.primaryCaseId, 'pda');
 });

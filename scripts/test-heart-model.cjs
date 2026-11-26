@@ -163,12 +163,23 @@ test('Экспорт левого типа загружается, сохран�
   }
 });
 
-test('Поражения не затрагивают посторонний бассейн, доминирование переключает нижнее русло', () => {
+test('Поражения не затрагивают посторонний бассейн, доминирование переключает нижнее русло, а маркеры ЗМЖВ и ЗБВ разнесены', () => {
   assert.deepEqual(affectedArterySegments('normal','right'), []);
   assert.ok(!affectedArterySegments('lad_prox','right').includes('LCx'));
   assert.ok(affectedArterySegments('lad_mid','right').includes('LAD_dist'));
   assert.ok(!affectedArterySegments('lad_mid','right').includes('LAD_prox'));
+  assert.deepEqual(affectedArterySegments('pda','right'), ['PDA']);
+  assert.deepEqual(affectedArterySegments('pda','left'), ['PDA']);
+  assert.deepEqual(affectedArterySegments('posterior','right'), ['PLB']);
+  assert.deepEqual(affectedArterySegments('posterior','left'), ['PLB']);
   assert.ok(affectedArterySegments('nstemi_inf','left').includes('LCx'));
   assert.ok(!affectedArterySegments('nstemi_inf','left').includes('RCA_dist'));
   assert.ok(!affectedArterySegments('rca_prox','left').includes('PDA'));
+  for (const dom of ['right', 'left']) {
+    const lms = getHeartLandmarks(dom);
+    const pPda = lms.pda.localPos;
+    const pPlb = lms.posterior.localPos;
+    const dist = Math.hypot(pPda[0] - pPlb[0], pPda[1] - pPlb[1], pPda[2] - pPlb[2]);
+    assert.ok(dist > 0.1, `${dom}: маркеры ЗМЖВ и ЗБВ слишком близко (${dist.toFixed(4)})`);
+  }
 });

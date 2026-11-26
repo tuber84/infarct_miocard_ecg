@@ -16,6 +16,7 @@ export function affectedArterySegments(caseId: CaseId, dominance: Dominance): re
     case 'lad_wrap': return ['LAD_dist'];
     case 'd1': return ['D1'];
     case 'lcx': return dominance === 'left' ? ['LCx', 'OM1', 'PDA', 'PLB'] : ['LCx', 'OM1'];
+    case 'pda': return ['PDA'];
     case 'posterior': return ['PLB'];
     case 'nstemi_inf': return dominance === 'left' ? ['LCx', 'OM1', 'PDA', 'PLB'] : ['RCA_dist', 'PDA', 'PLB'];
     case 'rca_prox': return dominance === 'left' ? ['RCA_prox', 'RCA_mid', 'RCA_dist'] : ['RCA_prox', 'RCA_mid', 'RCA_dist', 'PDA', 'PLB'];

@@ -32,6 +32,7 @@ export type CaseId =
   | 'd1'
   | 'rca_prox'
   | 'rca_dist'
+  | 'pda'
   | 'lcx'
   | 'posterior'
   | 'lmca'
@@ -91,10 +92,15 @@ export interface ClinicalInsightsData {
 }
 
 export interface DominanceOverride {
+  arteryName?: string;
+  segmentLabel?: string;
+  description?: string;
   ahaSegments?: number[];
   rvInvolved?: boolean;
+  reciprocalSegments?: number[];
   territoryNote?: string;
   leads?: Partial<Record<LeadId, LeadShiftProfile>>;
+  replaceLeads?: boolean;
 }
 
 export interface CoronaryCase {
