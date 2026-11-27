@@ -58,3 +58,46 @@
 @media (max-width: 767px) {
   .ecg-paper button { min-height: 44px; min-width: 44px; }
 }
+
+/* Печать 12-канальной ЭКГ-плёнки на лист А4 (альбом) без панелей интерфейса */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .ecg-paper,
+  .ecg-paper * {
+    visibility: visible;
+  }
+
+  .ecg-paper {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .ecg-paper .no-print {
+    display: none !important;
+  }
+
+  .ecg-paper [data-ecg-viewport] {
+    overflow: visible !important;
+  }
+
+  .ecg-paper canvas {
+    width: 100% !important;
+    height: auto !important;
+  }
+}

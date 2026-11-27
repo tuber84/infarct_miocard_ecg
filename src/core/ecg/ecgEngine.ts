@@ -5,6 +5,7 @@ import {
   ManualLeadState,
   MiStageId,
   QrsPattern,
+  RhythmDisorder,
   StageModifiers,
   StagePreset,
 } from '../types';
@@ -577,12 +578,13 @@ export function buildManualFallbackLeads(
 export function getBeatTiming(
   beatDurationSec: number,
   aivr = false,
-  qrsPattern: QrsPattern = 'normal'
+  qrsPattern: QrsPattern = 'normal',
+  prDurationSec = 0.162
 ) {
   const rateScale = clamp(Math.pow(beatDurationSec / (60 / 72), 0.35), 0.78, 1.12);
   const pOnset = 0.02;
   const pEnd = 0.12;
-  const qrsOnset = pOnset + 0.162;
+  const qrsOnset = pOnset + prDurationSec;
   const isLbbb = !aivr && qrsPattern === 'lbbb';
   const qrsDuration = aivr ? 0.144 : isLbbb ? 0.148 : 0.088;
   const j = qrsOnset + qrsDuration;
@@ -615,12 +617,95 @@ function pulse(t: number, start: number, end: number): number {
 
 /** Периодический сигнал: окончание T не обрезается границей RR при высокой ЧСС. */
 export function sampleBeatMv(
-  phaseSec: number, beatDurationSec: number, leadId: LeadId,
-  shiftProfile: LeadShiftProfile | undefined, stageMods: StageModifiers, options: EcgRenderOptions
+  phaseSec: number,
+  beatDurationSec: number,
+  leadId: LeadId,
+  shiftProfile: LeadShiftProfile | undefined,
+  stageMods: StageModifiers,
+  options: EcgRenderOptions,
+  prDurationSec = 0.162
 ): number {
   const phase = ((phaseSec % beatDurationSec) + beatDurationSec) % beatDurationSec;
-  return sampleSingleBeatMv(phase, beatDurationSec, leadId, shiftProfile, stageMods, options)
-    + sampleSingleBeatMv(phase + beatDurationSec, beatDurationSec, leadId, shiftProfile, stageMods, options);
+  return sampleSingleBeatMv(phase, beatDurationSec, leadId, shiftProfile, stageMods, options, prDurationSec)
+    + sampleSingleBeatMv(phase + beatDurationSec, beatDurationSec, leadId, shiftProfile, stageMods, options, prDurationSec);
+}
+
+const WENCKEBACH_PR_LIST = [0.162, 0.215, 0.268] as const;
+
+function samplePvcMv(localTimeSec: number, leadId: LeadId): number {
+  const pvcEnd = 0.39;
+  if (localTimeSec <= 0 || localTimeSec >= pvcEnd) return 0;
+  const qrsDur = 0.144;
+  const tOnset = 0.185;
+  const tPeak = 0.285;
+  const polarity = ['aVR', 'V1', 'V2', 'V3R', 'V4R'].includes(leadId) ? -1 : 1;
+  const qrs = polarity * (
+    1.35 * pulse(localTimeSec, 0, qrsDur * 0.68)
+    - 0.55 * pulse(localTimeSec, qrsDur * 0.45, qrsDur)
+  );
+  const tWindow = smoothstep(tOnset, tOnset + 0.02, localTimeSec)
+    * (1 - smoothstep(pvcEnd - 0.03, pvcEnd, localTimeSec));
+  const tWave = -polarity * 0.44 * gaussian(localTimeSec, tPeak, 0.038) * tWindow;
+  return qrs + tWave;
+}
+
+/**
+ * Расчёт мгновенного потенциала ЭКГ (в мВ) в абсолютном времени с поддержкой нарушений проводимости и ЖЭС.
+ */
+export function sampleEcgAtTimeMv(
+  absTimeSec: number,
+  beatDurationSec: number,
+  leadId: LeadId,
+  shiftProfile: LeadShiftProfile | undefined,
+  stageMods: StageModifiers,
+  options: EcgRenderOptions
+): number {
+  const rhythm = options.rhythmDisorder ?? 'none';
+  if (options.aivr || rhythm === 'none') {
+    return sampleBeatMv(absTimeSec, beatDurationSec, leadId, shiftProfile, stageMods, options);
+  }
+  if (rhythm === 'av_block_1') {
+    return sampleBeatMv(absTimeSec, beatDurationSec, leadId, shiftProfile, stageMods, options, 0.248);
+  }
+
+  const beatIdx = Math.floor(absTimeSec / beatDurationSec);
+  if (rhythm === 'wenckebach') {
+    let sum = 0;
+    for (let k = beatIdx - 1; k <= beatIdx; k++) {
+      const slot = ((k % 4) + 4) % 4;
+      const localT = absTimeSec - k * beatDurationSec;
+      if (slot === 3) {
+        sum += NORMAL_LEAD_BASE[leadId].p * pulse(localT, 0.02, 0.12);
+      } else {
+        sum += sampleSingleBeatMv(
+          localT,
+          beatDurationSec,
+          leadId,
+          shiftProfile,
+          stageMods,
+          options,
+          WENCKEBACH_PR_LIST[slot]
+        );
+      }
+    }
+    return sum;
+  }
+
+  // Эпизодические ЖЭС (5-ударный цикл: 3 синусовых, ранняя ЖЭС с полной компенсаторной паузой, 5-й синусовый)
+  let sum = 0;
+  for (let k = beatIdx - 1; k <= beatIdx; k++) {
+    const slot = ((k % 5) + 5) % 5;
+    if (slot === 3) continue;
+    const localT = absTimeSec - k * beatDurationSec;
+    sum += sampleSingleBeatMv(localT, beatDurationSec, leadId, shiftProfile, stageMods, options);
+  }
+  const cycleBase = Math.floor(beatIdx / 5) * 5;
+  const couplingSec = Math.max(0.38, 0.66 * beatDurationSec);
+  for (const base of [cycleBase - 5, cycleBase, cycleBase + 5]) {
+    const pvcStart = (base + 2) * beatDurationSec + couplingSec;
+    sum += samplePvcMv(absTimeSec - pvcStart, leadId);
+  }
+  return sum;
 }
 
 const LBBB_LEFT_LEADS = new Set<LeadId>(['I', 'aVL', 'V5', 'V6', 'V7', 'V8', 'V9']);
@@ -655,11 +740,12 @@ function sampleSingleBeatMv(
   leadId: LeadId,
   shiftProfile: LeadShiftProfile | undefined,
   stageMods: StageModifiers,
-  options: EcgRenderOptions
+  options: EcgRenderOptions,
+  prDurationSec = 0.162
 ): number {
   const base = NORMAL_LEAD_BASE[leadId];
   const qrsPattern: QrsPattern = options.qrsPattern ?? 'normal';
-  const timing = getBeatTiming(beatDurationSec, options.aivr, qrsPattern);
+  const timing = getBeatTiming(beatDurationSec, options.aivr, qrsPattern, prDurationSec);
   const { rateScale, qrsOnset, j: tJ, tOnset, tPeak: tT, tEnd } = timing;
   const t = phaseSec;
   if (t < timing.pOnset || t > tEnd) return 0;
@@ -879,8 +965,7 @@ export function generateLeadSignal(
 
   for (let i = 0; i < numSamples; i++) {
     const absTime = timeOffsetSec + i / sampleRate;
-    const phase = ((absTime % beatDuration) + beatDuration) % beatDuration;
-    let val = sampleBeatMv(phase, beatDuration, leadId, shiftProfile, stageMods, options);
+    let val = sampleEcgAtTimeMv(absTime, beatDuration, leadId, shiftProfile, stageMods, options);
 
     if (options.artifacts) {
       const drift =
@@ -909,11 +994,13 @@ export interface EcgMeasurements {
 export function getEcgMeasurements(
   heartRate: number,
   aivr: boolean,
-  qrsPattern: QrsPattern = 'normal'
+  qrsPattern: QrsPattern = 'normal',
+  rhythmDisorder: RhythmDisorder = 'none'
 ): EcgMeasurements {
   const hr = getEffectiveHeartRate(heartRate, aivr);
   const rrSec = 60 / hr;
-  const timing = getBeatTiming(rrSec, aivr, qrsPattern);
+  const prDurationSec = !aivr && rhythmDisorder === 'av_block_1' ? 0.248 : 0.162;
+  const timing = getBeatTiming(rrSec, aivr, qrsPattern, prDurationSec);
   const qt = timing.tEnd - timing.qrsOnset;
   return {
     hr,
@@ -921,6 +1008,87 @@ export function getEcgMeasurements(
     qrsMs: Math.round((timing.j - timing.qrsOnset) * 1000),
     qtMs: Math.round(qt * 1000),
     qtcMs: Math.round(qt / Math.sqrt(rrSec) * 1000),
+  };
+}
+
+export interface FrontalVectorAnalysis {
+  /** Электрическая ось сердца (QRS) в градусах по площади I и aVF */
+  qrsAxisDeg: number;
+  qrsAxisLabel: string;
+  /** Угол результирующего вектора повреждения ST (null, если ST у изолинии) */
+  stAxisDeg: number | null;
+  stMagnitudeMm: number;
+  /** Значения ST (мм) по 6 стандартным фронтальным отведениям */
+  cabreraStMm: Record<'I' | 'II' | 'III' | 'aVR' | 'aVL' | 'aVF', number>;
+}
+
+const FRONTAL_AXES: { lead: 'I' | 'II' | 'aVF' | 'III' | 'aVR' | 'aVL'; angleDeg: number }[] = [
+  { lead: 'I', angleDeg: 0 },
+  { lead: 'II', angleDeg: 60 },
+  { lead: 'aVF', angleDeg: 90 },
+  { lead: 'III', angleDeg: 120 },
+  { lead: 'aVR', angleDeg: -150 },
+  { lead: 'aVL', angleDeg: -30 },
+];
+
+export function computeFrontalVectors(
+  leadProfiles: Partial<Record<LeadId, LeadShiftProfile>>,
+  stageMods: StageModifiers,
+  heartRate: number,
+  options: EcgRenderOptions
+): FrontalVectorAnalysis {
+  const hr = getEffectiveHeartRate(heartRate, options.aivr);
+  const rr = 60 / hr;
+  const timing = getBeatTiming(rr, options.aivr, options.qrsPattern ?? 'normal');
+  const baseOpts: EcgRenderOptions = { ...options, artifacts: false };
+
+  const samples = 40;
+  let areaI = 0;
+  let areaAvf = 0;
+  for (let k = 0; k <= samples; k++) {
+    const t = timing.qrsOnset + ((timing.j - timing.qrsOnset) * k) / samples;
+    const weight = k === 0 || k === samples ? 0.5 : 1;
+    areaI += weight * sampleBeatMv(t, rr, 'I', leadProfiles.I, stageMods, baseOpts);
+    areaAvf += weight * sampleBeatMv(t, rr, 'aVF', leadProfiles.aVF, stageMods, baseOpts);
+  }
+  const qrsAxisDeg = Math.round((Math.atan2(areaAvf, areaI) * 180) / Math.PI);
+  const qrsAxisLabel =
+    qrsAxisDeg >= -30 && qrsAxisDeg <= 90
+      ? 'Нормальная'
+      : qrsAxisDeg < -30 && qrsAxisDeg >= -90
+        ? 'Отклонение влево'
+        : qrsAxisDeg > 90 && qrsAxisDeg <= 180
+          ? 'Отклонение вправо'
+          : 'Резкое отклонение';
+
+  const cabreraStMm = {
+    I: getJShiftMm(leadProfiles.I, stageMods),
+    II: getJShiftMm(leadProfiles.II, stageMods),
+    III: getJShiftMm(leadProfiles.III, stageMods),
+    aVR: getJShiftMm(leadProfiles.aVR, stageMods),
+    aVL: getJShiftMm(leadProfiles.aVL, stageMods),
+    aVF: getJShiftMm(leadProfiles.aVF, stageMods),
+  };
+
+  let vx = 0;
+  let vy = 0;
+  for (const ax of FRONTAL_AXES) {
+    const val = cabreraStMm[ax.lead];
+    const rad = (ax.angleDeg * Math.PI) / 180;
+    vx += val * Math.cos(rad);
+    vy += val * Math.sin(rad);
+  }
+  vx /= 3;
+  vy /= 3;
+  const stMagnitudeMm = Math.hypot(vx, vy);
+  const stAxisDeg = stMagnitudeMm >= 0.35 ? Math.round((Math.atan2(vy, vx) * 180) / Math.PI) : null;
+
+  return {
+    qrsAxisDeg,
+    qrsAxisLabel,
+    stAxisDeg,
+    stMagnitudeMm,
+    cabreraStMm,
   };
 }
 

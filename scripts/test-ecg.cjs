@@ -11,7 +11,19 @@ require.extensions['.ts'] = (module, filename) => {
   module._compile(result.outputText, filename);
 };
 
-const { sampleBeatMv, generateLeadSignal, getBeatTiming, getEcgMeasurements, getJShiftMm, computeStageModifiers, getLeadBadge, DE_WINTER_STAGE_SUMMARIES, STAGE_PRESETS } = require('../src/core/ecg/ecgEngine.ts');
+const {
+  sampleBeatMv,
+  sampleEcgAtTimeMv,
+  generateLeadSignal,
+  getBeatTiming,
+  getEcgMeasurements,
+  getJShiftMm,
+  computeStageModifiers,
+  computeFrontalVectors,
+  getLeadBadge,
+  DE_WINTER_STAGE_SUMMARIES,
+  STAGE_PRESETS,
+} = require('../src/core/ecg/ecgEngine.ts');
 const { CORONARY_CASES, resolveCaseForDominance, STANDARD_LEADS, EXTRA_LEADS } = require('../src/core/content/coronaryCases.ts');
 const options = { aivr: false, artifacts: false };
 const rates = [40, 45, 54, 72, 95, 135, 150];
@@ -197,4 +209,47 @@ test('Острый перикардит (смещение PR без Q) и Так
   assert.ok(Math.min(...tTako) < -0.6, 'Ожидалась глубокая симметричная инверсия T при Такоцубо');
   const qTako = sampleBeatMv(timing.qrsOnset + 0.014, rr, 'V4', CORONARY_CASES.takotsubo.leads.V4, chronic, options);
   assert.ok(qTako >= qNorm - 0.05, 'Такоцубо не должен формировать глубокий некротический Q');
+});
+
+test('Нарушения проводимости и ритма (АВ-блок I ст., Мобитц I Венкебах, ЖЭС) и векторный анализ ЭОС/ST', () => {
+  const stage = computeStageModifiers(.35, false);
+  const rr = 60 / 72;
+
+  // 1. АВ-блокада I ст.: PR = 248 мс, нормальное положение QRS сдвинуто на +86 мс
+  const mAv1 = getEcgMeasurements(72, false, 'normal', 'av_block_1');
+  assert.equal(mAv1.prMs, 248);
+  const { qrsOnset: av1Qrs } = getBeatTiming(rr, false, 'normal', 0.248);
+  const sigAv1 = generateLeadSignal('II', undefined, stage, rr, 1000, 72, { ...options, rhythmDisorder: 'av_block_1' });
+  const rPeakSample = sigAv1[Math.round((av1Qrs + 0.044) * 1000)];
+  assert.ok(rPeakSample > 0.7, `Пик R при АВ-блок I должен быть в смещённом окне, получено ${rPeakSample}`);
+
+  // 2. Периодика Венкебаха (Мобитц I): прогрессирующее удлинение PR и выпадение QRS на 4-м ударе
+  const wenckOpts = { ...options, rhythmDisorder: 'wenckebach' };
+  const prSlots = [0.162, 0.215, 0.268];
+  for (let slot = 0; slot < 3; slot++) {
+    const rTime = slot * rr + 0.02 + prSlots[slot] + 0.04;
+    const v = sampleEcgAtTimeMv(rTime, rr, 'II', undefined, stage, wenckOpts);
+    assert.ok(v > 0.65, `Слот ${slot}: ожидался проведённый R, получено ${v}`);
+  }
+  // 4-й слот: P сохранён (t = 3*rr + 0.07), QRS отсутствует (t = 3*rr + 0.02 + 0.22 + 0.04)
+  assert.ok(sampleEcgAtTimeMv(3 * rr + 0.07, rr, 'II', undefined, stage, wenckOpts) > 0.1, 'Должен быть заблокированный P');
+  assert.equal(sampleEcgAtTimeMv(3 * rr + 0.26, rr, 'II', undefined, stage, wenckOpts), 0, 'QRS на 4-м ударе должен выпасть');
+
+  // 3. ЖЭС: на 4-м слоте преждевременный широкий комплекс и затем тихая компенсаторная пауза на месте пропущенного синусового удара
+  const pvcOpts = { ...options, rhythmDisorder: 'pvc' };
+  const pvcStart = 2 * rr + Math.max(0.38, 0.66 * rr);
+  assert.ok(sampleEcgAtTimeMv(pvcStart + 0.045, rr, 'II', undefined, stage, pvcOpts) > 0.8, 'Ожидался широкий комплекс ЖЭС');
+  assert.ok(sampleEcgAtTimeMv(3 * rr + 0.06, rr, 'II', undefined, stage, pvcOpts) <= 0, 'Не должно быть положительного синусового P во время реполяризации ЖЭС');
+  assert.equal(sampleEcgAtTimeMv(3 * rr + 0.25, rr, 'II', undefined, stage, pvcOpts), 0, 'Компенсаторная пауза на изолинии');
+
+  // 4. Фронтальные векторы (ЭОС + вектор ST на круге Кабрера)
+  const normVec = computeFrontalVectors(CORONARY_CASES.normal.leads, stage, 72, options);
+  assert.ok(normVec.qrsAxisDeg >= -30 && normVec.qrsAxisDeg <= 90, `ЭОС нормы вне диапазона: ${normVec.qrsAxisDeg}`);
+  assert.equal(normVec.stAxisDeg, null);
+
+  const rcaVec = computeFrontalVectors(CORONARY_CASES.rca_prox.leads, stage, 54, options);
+  assert.ok(rcaVec.stAxisDeg !== null && rcaVec.stAxisDeg > 70 && rcaVec.stAxisDeg < 140, `Вектор ST при ПКА должен смотреть вниз/вправо (+70..+140°), получено ${rcaVec.stAxisDeg}`);
+
+  const d1Vec = computeFrontalVectors(CORONARY_CASES.d1.leads, stage, 78, options);
+  assert.ok(d1Vec.stAxisDeg !== null && d1Vec.stAxisDeg < -10 && d1Vec.stAxisDeg > -80, `Вектор ST при D1 должен смотреть влево-вверх (-10..-80°), получено ${d1Vec.stAxisDeg}`);
 });

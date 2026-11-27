@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Activity, Pause, Play } from 'lucide-react';
 import { STANDARD_LEADS } from '../core/content/coronaryCases';
-import { sampleBeatMv, getEffectiveHeartRate } from '../core/ecg/ecgEngine';
+import { sampleEcgAtTimeMv, getEffectiveHeartRate } from '../core/ecg/ecgEngine';
 import {
   EcgRenderOptions,
   LeadId,
   LeadShiftProfile,
+  RhythmDisorder,
   StageModifiers,
 } from '../core/types';
 
@@ -16,6 +17,7 @@ interface LiveMonitorProps {
   reperfused: boolean;
   options: EcgRenderOptions;
   onToggleAivr: () => void;
+  onChangeRhythmDisorder?: (next: RhythmDisorder) => void;
   defaultLead?: LeadId;
 }
 
@@ -26,6 +28,7 @@ const LiveMonitorComponent: React.FC<LiveMonitorProps> = ({
   reperfused,
   options,
   onToggleAivr,
+  onChangeRhythmDisorder,
   defaultLead = 'V2',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -191,14 +194,13 @@ const LiveMonitorComponent: React.FC<LiveMonitorProps> = ({
 
         for (let step = 0; step < dx; step++) {
           sim.simTime += 1 / pxPerSec;
-          const phase = ((sim.simTime % beatDuration) + beatDuration) % beatDuration;
           const xIdx = sim.sweepX % size.width;
           sim.initialized[xIdx] = 1;
 
           for (let chIdx = 0; chIdx < activeLeads.length; chIdx++) {
             const lid = activeLeads[chIdx];
-            let mv = sampleBeatMv(
-              phase,
+            let mv = sampleEcgAtTimeMv(
+              sim.simTime,
               beatDuration,
               lid,
               cur.leadProfiles[lid],
@@ -339,7 +341,26 @@ const LiveMonitorComponent: React.FC<LiveMonitorProps> = ({
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onChangeRhythmDisorder && (
+            <select
+              aria-label="Ритм и проводимость"
+              value={options.aivr ? 'none' : options.rhythmDisorder ?? 'none'}
+              disabled={options.aivr}
+              onChange={(e) => onChangeRhythmDisorder(e.target.value as RhythmDisorder)}
+              className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
+                !options.aivr && (options.rhythmDisorder ?? 'none') !== 'none'
+                  ? 'border-amber-500 bg-amber-50 text-amber-900'
+                  : 'border-slate-200 bg-slate-50 text-slate-700'
+              } disabled:opacity-50`}
+            >
+              <option value="none">Синусовый</option>
+              <option value="av_block_1">АВ-блок I ст. (PR 248)</option>
+              <option value="wenckebach">Мобитц I (Венкебах)</option>
+              <option value="pvc">ЖЭС (PVC)</option>
+            </select>
+          )}
+
           {reperfused && (
             <button
               type="button"

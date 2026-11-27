@@ -12,7 +12,9 @@ import {
 } from '../core/content/coronaryCases';
 import {
   buildManualFallbackLeads,
+  computeFrontalVectors,
   computeStageModifiers,
+  getNearestStagePreset,
 } from '../core/ecg/ecgEngine';
 import { localizeFromManualLeads } from '../core/ecg/localizer';
 import { getAtlasScenario } from '../core/scenarios/catalog';
@@ -22,8 +24,10 @@ import {
   LeadId,
   LeadShiftProfile,
   ManualLeadState,
+  RhythmDisorder,
 } from '../core/types';
 import { AhaBullseye } from './AhaBullseye';
+import { CabreraCircle } from './CabreraCircle';
 import { ClinicalInsights } from './ClinicalInsights';
 import { EcgPaper } from './EcgPaper';
 import { Heart3D } from './Heart3D';
@@ -108,6 +112,7 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
   const [heartRate, setHeartRate] = useState<number>(initialCase.defaultHeartRate);
   const [artifacts, setArtifacts] = useState<boolean>(false);
   const [aivr, setAivr] = useState<boolean>(false);
+  const [rhythmDisorder, setRhythmDisorder] = useState<RhythmDisorder>('none');
   const [showExtraRow, setShowExtraRow] = useState<boolean>(
     initialCase.recommendedExtraLeads.length > 0
   );
@@ -207,13 +212,49 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
     });
   }, []);
 
-  const handleToggleAivr = useCallback(() => setAivr((v) => !v), []);
+  const handleToggleAivr = useCallback(() => {
+    setAivr((prev) => {
+      const next = !prev;
+      if (next) setRhythmDisorder('none');
+      return next;
+    });
+  }, []);
+  const handleChangeRhythmDisorder = useCallback((next: RhythmDisorder) => {
+    setRhythmDisorder(next);
+    if (next !== 'none') setAivr(false);
+  }, []);
   const handleToggleArtifacts = useCallback(() => setArtifacts((v) => !v), []);
   const handleToggleExtraRow = useCallback(() => setShowExtraRow((v) => !v), []);
 
   const ecgOptions = useMemo(
-    () => ({ artifacts, aivr, qrsPattern: resolvedCase.caseData.qrsPattern }),
-    [artifacts, aivr, resolvedCase.caseData.qrsPattern]
+    () => ({
+      artifacts,
+      aivr,
+      qrsPattern: resolvedCase.caseData.qrsPattern,
+      rhythmDisorder,
+    }),
+    [artifacts, aivr, resolvedCase.caseData.qrsPattern, rhythmDisorder]
+  );
+
+  const frontalVectors = useMemo(
+    () => computeFrontalVectors(effectiveLeadProfiles, stageMods, heartRate, ecgOptions),
+    [effectiveLeadProfiles, stageMods, heartRate, ecgOptions]
+  );
+
+  const nearestStage = getNearestStagePreset(timeline);
+  const snapshotLabel = manualMode
+    ? 'Ручной профиль ЭКГ'
+    : `${resolvedCase.caseData.shortTitle} · ${nearestStage.label}${reperfused ? ' (ЧКВ)' : ''}`;
+  const exportMeta = useMemo(
+    () => ({
+      title: manualMode ? 'КардиоАтлас ЭКГ · Ручной анализ' : resolvedCase.caseData.shortTitle,
+      subtitle: `${nearestStage.label} (${nearestStage.timeRange})${reperfused ? ' · после ЧКВ (TIMI 3)' : ''} · ${dominance === 'right' ? 'Правый тип' : 'Левый тип'}`,
+      arteryName: manualMode
+        ? 'Оценка по отмеченным отведениям'
+        : `${resolvedCase.arteryName} — ${resolvedCase.segmentLabel}`,
+      criteria: resolvedCase.caseData.clinicalInsights.ecgCriteria,
+    }),
+    [manualMode, resolvedCase, nearestStage, reperfused, dominance]
   );
 
   // Отведение по умолчанию для монитора реального времени
@@ -642,6 +683,9 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
               activeCaseId={effectiveCaseId}
               lesionType={resolvedCase.caseData.lesionType}
             />}
+
+            {/* Векторный анализ фронтальной плоскости (ЭОС и вектор ST) */}
+            <CabreraCircle analysis={frontalVectors} />
           </div>
         </div>
 
@@ -665,6 +709,7 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
           reperfused={reperfused}
           options={ecgOptions}
           onToggleAivr={handleToggleAivr}
+          onChangeRhythmDisorder={handleChangeRhythmDisorder}
           defaultLead={defaultMonitorLead}
         />
 
@@ -679,6 +724,8 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
           onToggleArtifacts={handleToggleArtifacts}
           showExtraRow={showExtraRow}
           onToggleExtraRow={handleToggleExtraRow}
+          snapshotLabel={snapshotLabel}
+          exportMeta={exportMeta}
         />
 
         {/* Клинические подсказки и тактика в рентгеноперационной */}

@@ -1,13 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Ruler, Sparkles, ZoomIn, ZoomOut } from 'lucide-react';
-import { EXTRA_LEADS } from '../core/content/coronaryCases';
-import {
-  generateLeadSignal,
-  getEcgMeasurements,
-  getBeatTiming,
-  getEffectiveHeartRate,
-  sampleBeatMv,
-} from '../core/ecg/ecgEngine';
+import { Download, GitCompare, Printer, RotateCcw, Ruler, Sparkles, ZoomIn, ZoomOut } from 'lucide-react';
+import { getEcgMeasurements } from '../core/ecg/ecgEngine';
 import {
   CaseId,
   EcgRenderOptions,
@@ -15,6 +8,14 @@ import {
   LeadShiftProfile,
   StageModifiers,
 } from '../core/types';
+import {
+  drawEcgGrid,
+  drawEcgWaveforms,
+  type EcgExportMeta,
+  type EcgSnapshot,
+  exportEcgToPng,
+  getMaxStandardStMm,
+} from '../utils/ecgPaperRender';
 
 interface EcgPaperProps {
   lockedClinicalSettings?: boolean;
@@ -27,22 +28,9 @@ interface EcgPaperProps {
   onToggleArtifacts: () => void;
   showExtraRow: boolean;
   onToggleExtraRow: () => void;
+  snapshotLabel?: string;
+  exportMeta?: EcgExportMeta;
 }
-
-const GRID_3X4: LeadId[][] = [
-  ['I', 'aVR', 'V1', 'V4'],
-  ['II', 'aVL', 'V2', 'V5'],
-  ['III', 'aVF', 'V3', 'V6'],
-];
-
-const GRID_6X2: LeadId[][] = [
-  ['I', 'V1'],
-  ['II', 'V2'],
-  ['III', 'V3'],
-  ['aVR', 'V4'],
-  ['aVL', 'V5'],
-  ['aVF', 'V6'],
-];
 
 interface CaliperBox {
   x1: number;
@@ -61,6 +49,8 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
   onToggleArtifacts,
   showExtraRow,
   onToggleExtraRow,
+  snapshotLabel,
+  exportMeta,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const paperViewportRef = useRef<HTMLDivElement>(null);
@@ -73,6 +63,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
   const [zoom, setZoom] = useState<number>(1);
   const [caliperEnabled, setCaliperEnabled] = useState(false);
   const [caliper, setCaliper] = useState<CaliperBox | null>(null);
+  const [snapshot, setSnapshot] = useState<EcgSnapshot | null>(null);
   const pointerIdRef = useRef<number | null>(null);
   const previousCaliperRef = useRef<CaliperBox | null>(null);
   const zoomRef = useRef(zoom);
@@ -240,123 +231,23 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
     if (!gctx) return;
     gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    gctx.fillStyle = '#fff9f9';
-    gctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-    // Мелкая сетка 1 мм
-    gctx.strokeStyle = '#f8d4d4';
-    gctx.lineWidth = 0.7;
-    gctx.beginPath();
-    for (let mm = 0; mm <= totalPaperMmX; mm += 1) {
-      if (mm % 5 === 0) continue;
-      const x = mm * pxPerMm;
-      gctx.moveTo(x, 0);
-      gctx.lineTo(x, canvasHeight);
-    }
-    for (let mm = 0; mm <= totalPaperMmY; mm += 1) {
-      if (mm % 5 === 0) continue;
-      const y = mm * pxPerMm;
-      gctx.moveTo(0, y);
-      gctx.lineTo(canvasWidth, y);
-    }
-    gctx.stroke();
-
-    // Крупная сетка 5 мм
-    gctx.strokeStyle = '#e7a4a4';
-    gctx.lineWidth = 1.1;
-    gctx.beginPath();
-    for (let mm = 0; mm <= totalPaperMmX; mm += 5) {
-      const x = mm * pxPerMm;
-      gctx.moveTo(x, 0);
-      gctx.lineTo(x, canvasHeight);
-    }
-    for (let mm = 0; mm <= totalPaperMmY; mm += 5) {
-      const y = mm * pxPerMm;
-      gctx.moveTo(0, y);
-      gctx.lineTo(canvasWidth, y);
-    }
-    gctx.stroke();
-
-    const drawCalibrationPulse = (startXMm: number, baselineMm: number) => {
-      const hMm = gainMmMv;
-      const x0 = startXMm * pxPerMm;
-      const y0 = baselineMm * pxPerMm;
-      const yTop = (baselineMm - hMm) * pxPerMm;
-
-      gctx.strokeStyle = '#111827';
-      gctx.lineWidth = 1.5;
-      gctx.beginPath();
-      gctx.moveTo(x0, y0);
-      gctx.lineTo(x0 + 1.5 * pxPerMm, y0);
-      gctx.lineTo(x0 + 1.5 * pxPerMm, yTop);
-      gctx.lineTo(x0 + 6.5 * pxPerMm, yTop);
-      gctx.lineTo(x0 + 6.5 * pxPerMm, y0);
-      gctx.lineTo(x0 + 8 * pxPerMm, y0);
-      gctx.stroke();
-    };
-
-    const leftMarginMm = 4;
-    const signalStartMm = 14;
-    const activeWidthMm = 250;
-
-    if (layout === '3x4') {
-      const colWidthMm = activeWidthMm / 4;
-      for (let rIdx = 0; rIdx < 3; rIdx++) {
-        const baselineMm = 12 + rIdx * rowHeightMm + rowHeightMm * 0.6;
-        drawCalibrationPulse(leftMarginMm, baselineMm);
-        gctx.strokeStyle = '#64748b';
-        gctx.lineWidth = 1;
-        gctx.beginPath();
-        for (let cIdx = 1; cIdx < 4; cIdx++) {
-          const xMm = signalStartMm + cIdx * colWidthMm;
-          gctx.moveTo(xMm * pxPerMm, (baselineMm - 13) * pxPerMm);
-          gctx.lineTo(xMm * pxPerMm, (baselineMm + 8) * pxPerMm);
-        }
-        gctx.stroke();
-      }
-      const rhythmBaseMm = 12 + 3 * rowHeightMm + rowHeightMm * 0.6;
-      drawCalibrationPulse(leftMarginMm, rhythmBaseMm);
-    } else {
-      const colWidthMm = activeWidthMm / 2;
-      for (let rIdx = 0; rIdx < 6; rIdx++) {
-        const baselineMm = 12 + rIdx * rowHeightMm + rowHeightMm * 0.6;
-        drawCalibrationPulse(leftMarginMm, baselineMm);
-        const xMm = signalStartMm + colWidthMm;
-        gctx.strokeStyle = '#64748b';
-        gctx.lineWidth = 1;
-        gctx.beginPath();
-        gctx.moveTo(xMm * pxPerMm, (baselineMm - 12) * pxPerMm);
-        gctx.lineTo(xMm * pxPerMm, (baselineMm + 8) * pxPerMm);
-        gctx.stroke();
-      }
-    }
-
-    if (showExtraRow) {
-      const extraStartY = 12 + rowsCount * rowHeightMm;
-      const extraBaseMm = extraStartY + 20;
-      gctx.strokeStyle = '#cbd5e1';
-      gctx.lineWidth = 1;
-      gctx.beginPath();
-      gctx.moveTo(0, (extraStartY + 1) * pxPerMm);
-      gctx.lineTo(canvasWidth, (extraStartY + 1) * pxPerMm);
-      gctx.stroke();
-
-      drawCalibrationPulse(leftMarginMm, extraBaseMm);
-      const segW = activeWidthMm / EXTRA_LEADS.length;
-      gctx.strokeStyle = '#64748b';
-      gctx.lineWidth = 1;
-      gctx.beginPath();
-      for (let idx = 1; idx < EXTRA_LEADS.length; idx++) {
-        const xMm = signalStartMm + idx * segW;
-        gctx.moveTo(xMm * pxPerMm, (extraBaseMm - 12) * pxPerMm);
-        gctx.lineTo(xMm * pxPerMm, (extraBaseMm + 7) * pxPerMm);
-      }
-      gctx.stroke();
-    }
+    drawEcgGrid(gctx, {
+      canvasWidth,
+      canvasHeight,
+      pxPerMm,
+      totalPaperMmX,
+      totalPaperMmY,
+      layout,
+      rowsCount,
+      rowHeightMm,
+      gainMmMv,
+      showExtraRow,
+    });
   }, [
     canvasWidth,
     canvasHeight,
     pxPerMm,
+    totalPaperMmX,
     totalPaperMmY,
     layout,
     gainMmMv,
@@ -385,119 +276,22 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
       ctx.drawImage(gridCanvasRef.current, 0, 0, canvasWidth, canvasHeight);
     }
 
-    const drawLeadSegment = (
-      leadId: LeadId,
-      startXMm: number,
-      widthMm: number,
-      baselineMm: number,
-      timeOffsetSec: number
-    ) => {
-      const durationSec = widthMm / speedMmSec;
-      const sampleRate = 1000;
-      const signal = generateLeadSignal(
-        leadId,
-        leadProfiles[leadId],
-        stageMods,
-        durationSec,
-        sampleRate,
-        heartRate,
-        options,
-        timeOffsetSec
-      );
-
-      ctx.strokeStyle = '#0f172a';
-      ctx.lineWidth = Math.max(1.25, 1.35 * zoom);
-      ctx.lineJoin = 'bevel';
-      ctx.beginPath();
-
-      for (let i = 0; i < signal.length; i++) {
-        const t = i / sampleRate;
-        const x = (startXMm + t * speedMmSec) * pxPerMm;
-        const y = (baselineMm - signal[i] * gainMmMv) * pxPerMm;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      if (caliperEnabled) {
-        const rr = 60 / getEffectiveHeartRate(heartRate, options.aivr);
-        const timing = getBeatTiming(rr, options.aivr, options.qrsPattern);
-        const cycleStart = Math.ceil(timeOffsetSec / rr) * rr;
-        const markers: [string, number][] = [
-          ...(!options.aivr ? [['P', timing.pOnset] as [string, number]] : []),
-          ['QRS', timing.qrsOnset], ['J', timing.j], ['Tк', timing.tEnd],
-        ];
-        ctx.save();
-        ctx.strokeStyle = '#0369a1';
-        ctx.fillStyle = '#0369a1';
-        ctx.font = `${Math.round(9 * zoom)}px sans-serif`;
-        ctx.lineWidth = 0.8;
-        for (const [label, phase] of markers) {
-          const localTime = cycleStart + phase - timeOffsetSec;
-          if (localTime < 0 || localTime > durationSec) continue;
-          const x = (startXMm + localTime * speedMmSec) * pxPerMm;
-          ctx.setLineDash([2, 3]);
-          ctx.beginPath();
-          ctx.moveTo(x, (baselineMm - 6) * pxPerMm);
-          ctx.lineTo(x, (baselineMm + 5) * pxPerMm);
-          ctx.stroke();
-          ctx.fillText(label, x + 2, (baselineMm + (label === 'J' ? 10 : 7)) * pxPerMm);
-          if (label === 'J') {
-            const mv = sampleBeatMv(phase, rr, leadId, leadProfiles[leadId], stageMods, options);
-            ctx.setLineDash([]);
-            ctx.beginPath();
-            ctx.arc(x, (baselineMm - mv * gainMmMv) * pxPerMm, 2.5, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-        ctx.restore();
-      }
-
-      ctx.fillStyle = '#0f172a';
-      ctx.font = `bold ${Math.round(11 * Math.max(0.85, zoom))}px Inter, sans-serif`;
-      ctx.fillText(leadId, (startXMm + 2) * pxPerMm, (baselineMm - 11) * pxPerMm);
-    };
-
-    const signalStartMm = 14;
-    const activeWidthMm = 250;
-
-    if (layout === '3x4') {
-      const colWidthMm = activeWidthMm / 4;
-      GRID_3X4.forEach((rowLeads, rIdx) => {
-        const baselineMm = 12 + rIdx * rowHeightMm + rowHeightMm * 0.6;
-        rowLeads.forEach((lid, cIdx) => {
-          const xMm = signalStartMm + cIdx * colWidthMm;
-          const timeOffset = (cIdx * colWidthMm) / speedMmSec;
-          drawLeadSegment(lid, xMm, colWidthMm, baselineMm, timeOffset);
-        });
-      });
-
-      const rhythmBaseMm = 12 + 3 * rowHeightMm + rowHeightMm * 0.6;
-      drawLeadSegment('II', signalStartMm, activeWidthMm, rhythmBaseMm, 0);
-      ctx.fillStyle = '#b91c1c';
-      ctx.font = `600 ${Math.round(9.5 * Math.max(0.85, zoom))}px Inter, sans-serif`;
-      ctx.fillText('(ритм)', (signalStartMm + 11) * pxPerMm, (rhythmBaseMm - 11) * pxPerMm);
-    } else {
-      const colWidthMm = activeWidthMm / 2;
-      GRID_6X2.forEach((rowLeads, rIdx) => {
-        const baselineMm = 12 + rIdx * rowHeightMm + rowHeightMm * 0.6;
-        rowLeads.forEach((lid, cIdx) => {
-          const xMm = signalStartMm + cIdx * colWidthMm;
-          const timeOffset = (cIdx * colWidthMm) / speedMmSec;
-          drawLeadSegment(lid, xMm, colWidthMm, baselineMm, timeOffset);
-        });
-      });
-    }
-
-    if (showExtraRow) {
-      const extraStartY = 12 + rowsCount * rowHeightMm;
-      const extraBaseMm = extraStartY + 20;
-      const segW = activeWidthMm / EXTRA_LEADS.length;
-      EXTRA_LEADS.forEach((lid, idx) => {
-        const xMm = signalStartMm + idx * segW;
-        drawLeadSegment(lid, xMm, segW, extraBaseMm, (idx * segW) / speedMmSec);
-      });
-    }
+    drawEcgWaveforms(ctx, {
+      pxPerMm,
+      scaleRatio: zoom,
+      layout,
+      rowsCount,
+      rowHeightMm,
+      speedMmSec,
+      gainMmMv,
+      showExtraRow,
+      caliperEnabled,
+      leadProfiles,
+      stageMods,
+      heartRate,
+      options,
+      snapshot,
+    });
   }, [
     canvasWidth,
     canvasHeight,
@@ -511,6 +305,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
     stageMods,
     heartRate,
     options,
+    snapshot,
     showExtraRow,
     rowsCount,
     rowHeightMm,
@@ -560,11 +355,52 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
     return { dxMm: dxMm.toFixed(1), dyMm: dyMm.toFixed(1), dtMs, estBpm, dMv };
   })();
 
-  const measurements = getEcgMeasurements(heartRate, options.aivr, options.qrsPattern);
+  const measurements = getEcgMeasurements(
+    heartRate,
+    options.aivr,
+    options.qrsPattern,
+    options.rhythmDisorder
+  );
+  const currentMaxStMm = getMaxStandardStMm(leadProfiles, stageMods);
+  const resolutionPct =
+    snapshot && snapshot.maxStMm >= 1.0
+      ? Math.round(((snapshot.maxStMm - currentMaxStMm) / snapshot.maxStMm) * 100)
+      : null;
+
+  const captureSnapshot = () => {
+    setSnapshot({
+      label: snapshotLabel ?? 'Зафиксированная кривая',
+      leadProfiles,
+      stageMods,
+      heartRate,
+      options,
+      maxStMm: currentMaxStMm,
+    });
+  };
+
+  const handleExportPng = (mode: 'clean' | 'annotated') => {
+    exportEcgToPng({
+      mode,
+      totalPaperMmX,
+      totalPaperMmY,
+      layout,
+      rowsCount,
+      rowHeightMm,
+      speedMmSec,
+      gainMmMv,
+      showExtraRow,
+      leadProfiles,
+      stageMods,
+      heartRate,
+      options,
+      snapshot,
+      exportMeta,
+    });
+  };
 
   return (
     <div className="ecg-paper min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
+      <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
             Симуляция 12 отведений
@@ -678,6 +514,54 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
             Калипер
           </button>
 
+          {!lockedClinicalSettings && (
+            <>
+              <button
+                type="button"
+                onClick={captureSnapshot}
+                title="Зафиксировать текущую кривую как синий пунктирный контур «Было» для сравнения динамики"
+                className={`flex items-center gap-1 rounded-md border px-2 py-1 font-semibold transition ${
+                  snapshot
+                    ? 'border-sky-500 bg-sky-50 text-sky-800'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <GitCompare className="h-3 w-3" />
+                {snapshot ? 'Обновить «Было»' : 'Зафиксировать «Было»'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleExportPng('clean')}
+                title="Скачать PNG-плёнку высокого разрешения без диагноза (раздатка для обучения)"
+                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <Download className="h-3 w-3" />
+                PNG (чистая)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleExportPng('annotated')}
+                title="Скачать PNG-плёнку с названием сценария, артерией и критериями ЭКГ"
+                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <Download className="h-3 w-3" />
+                PNG (разбор)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                title="Распечатать ленту на лист А4 (альбомная ориентация)"
+                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <Printer className="h-3 w-3" />
+                Печать
+              </button>
+            </>
+          )}
+
           <div className="flex items-center rounded-md border border-slate-200 bg-white px-1">
             <button
               type="button"
@@ -706,7 +590,46 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b bg-slate-50 px-3 py-2 md:hidden" aria-label="Переход к отведениям">
+      {snapshot && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-200 bg-sky-50/70 px-3 py-1.5 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="flex items-center gap-1.5 font-semibold text-sky-900">
+              <span className="inline-block w-4 border-t-2 border-dashed border-sky-600" />
+              Эталон «Было»: {snapshot.label}
+            </span>
+            <span className="font-mono text-[11px] font-semibold text-slate-700">
+              Макс. ST↑: {snapshot.maxStMm.toFixed(1)} → {currentMaxStMm.toFixed(1)} мм
+            </span>
+            {resolutionPct !== null && (
+              <span
+                className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                  resolutionPct >= 50
+                    ? 'bg-emerald-600 text-white'
+                    : resolutionPct > 0
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'bg-slate-200 text-slate-700'
+                }`}
+              >
+                {resolutionPct >= 50
+                  ? `Резолюция ST ≥ 50% (−${resolutionPct}%)`
+                  : resolutionPct > 0
+                    ? `Снижение ST на ${resolutionPct}%`
+                    : `Без снижения ST (${resolutionPct}%)`}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setSnapshot(null)}
+            className="no-print flex items-center gap-1 rounded border border-sky-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-sky-800 hover:bg-sky-100"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Сбросить «Было»
+          </button>
+        </div>
+      )}
+
+      <div className="no-print flex flex-wrap gap-2 border-b bg-slate-50 px-3 py-2 md:hidden" aria-label="Переход к отведениям">
         {(layout === '3x4' ? ['I–III', 'aVR–aVF', 'V1–V3', 'V4–V6'] : ['I–aVF', 'V1–V6']).map((label, index) =>
           <button key={label} className="rounded border bg-white px-3 py-2 text-xs font-semibold" onClick={() => {
             if (paperViewportRef.current) paperViewportRef.current.scrollLeft = index * 250 / (layout === '3x4' ? 4 : 2) * pxPerMm;
@@ -764,7 +687,13 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
           </span>
           <span>
             <strong className="text-slate-800">PR:</strong>{' '}
-            {measurements.prMs > 0 ? `${measurements.prMs} мс` : '— (РИА)'}
+            {options.aivr
+              ? '— (РИА)'
+              : options.rhythmDisorder === 'wenckebach'
+                ? '162→268 мс (Мобитц I)'
+                : options.rhythmDisorder === 'av_block_1'
+                  ? '248 мс (АВ-блок I ст.)'
+                  : `${measurements.prMs} мс`}
           </span>
           <span>
             <strong className="text-slate-800">QRS:</strong> {measurements.qrsMs} мс
@@ -773,10 +702,15 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
             <strong className="text-slate-800">QT/QTc (Базетт):</strong> {measurements.qtMs}/
             {measurements.qtcMs} мс
           </span>
+          {!options.aivr && options.rhythmDisorder === 'pvc' && (
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-bold text-amber-900">
+              + ЖЭС (PVC)
+            </span>
+          )}
 
         </div>
 
-        {!lockedClinicalSettings && <div className="flex items-center gap-2">
+        {!lockedClinicalSettings && <div className="no-print flex items-center gap-2">
           <span className="text-[11px] font-semibold text-slate-500">ЧСС:</span>
           <input
             type="range"

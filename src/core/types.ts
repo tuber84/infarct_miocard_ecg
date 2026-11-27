@@ -24,6 +24,8 @@ export type SyndromeCategory = 'stemi' | 'nstemi' | 'mimic' | 'normal';
 
 export type QrsPattern = 'normal' | 'lbbb';
 
+export type RhythmDisorder = 'none' | 'av_block_1' | 'wenckebach' | 'pvc';
+
 export type LesionType = 'none' | 'occlusion' | 'subocclusion' | 'stenosis';
 
 export type CaseId =
@@ -184,11 +186,12 @@ export interface StageModifiers {
   deWinterFactor: number;
 }
 
-export interface EcgRenderOptions {
+export type EcgRenderOptions = {
   artifacts: boolean;
   aivr: boolean;
   qrsPattern?: QrsPattern;
-}
+  rhythmDisorder?: RhythmDisorder;
+};
 
 export interface LocalizationResult {
   /** Похожий учебный сценарий; null означает недостаточную или противоречивую разметку. */

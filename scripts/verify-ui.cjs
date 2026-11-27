@@ -58,6 +58,27 @@ app.whenReady().then(async () => {
       check(text().includes('Задняя межжелудочковая ветвь ОВ'), 'Не переключился бассейн ЗМЖВ при левом типе');
       await click('Правый тип');
       await click('ПМЖВ прокс.');
+      check(/Круг Кабрера/i.test(text()), 'Нет круга Кабрера');
+      await click('Зафиксировать «Было»');
+      await click('Сравнить с ранней успешной реперфузией');
+      check(text().includes('Резолюция ST ≥ 50%'), 'Нет расчёта резолюции ST при сравнении Было/Стало');
+      await click('Сбросить «Было»');
+      await click('После ранней успешной реперфузии · TIMI 3');
+      const rhythmSelect = document.querySelector('select[aria-label="Ритм и проводимость"]');
+      check(rhythmSelect, 'Нет выбора ритма на мониторе');
+      const setRhythm = async (val) => {
+        Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(rhythmSelect, val);
+        rhythmSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        await wait();
+      };
+      await setRhythm('av_block_1');
+      check(text().includes('248 мс'), 'Нет PR 248 мс при АВ-блокаде I ст.');
+      await setRhythm('wenckebach');
+      check(text().includes('162→268 мс'), 'Нет интервалов Мобитц I');
+      await setRhythm('pvc');
+      check(text().includes('+ ЖЭС'), 'Нет индикации ЖЭС');
+      await setRhythm('none');
+      check(text().includes('PNG (чистая)') && text().includes('PNG (разбор)') && text().includes('Печать'), 'Нет кнопок экспорта и печати ЭКГ');
       await click('ОКСбпST / паттерны');
       for (const label of ['ИМбпST нижн.', 'Велленс A', 'Велленс B', 'де Винтер', 'Ствол ЛКА']) await click(label);
       await click('Блокады / мимики');
