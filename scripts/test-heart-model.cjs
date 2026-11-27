@@ -17,10 +17,6 @@ const {
   segmentContrastDistance,
   segmentRetrogradeDistance,
 } = require('../src/presentation/segmentedHeart.ts');
-const {
-  formatArteryLabel,
-  getSyntaxSegmentCode,
-} = require('../src/presentation/arteryLabels.ts');
 const { getHeartSegmentGeometry } = require('../src/presentation/heartSegmentGeometry.ts');
 const { CASE_ORDER, CORONARY_CASES } = require('../src/core/content/coronaryCases.ts');
 
@@ -201,20 +197,7 @@ test('Поражения не затрагивают посторонний ба
   }
 });
 
-test('Нумерация SYNTAX (1–16) и коллатерали Rentrop (ретроградный градиент и донорский бассейн) согласованы', () => {
-  const expectedRight = {
-    RCA_prox: '1', RCA_mid: '2', RCA_dist: '3', PDA: '4', PLB: '16',
-    LMCA: '5', LAD_prox: '6', LAD_mid: '7', LAD_dist: '8', D1: '9', D2: '10', LCx: '11/13', OM1: '12a',
-  };
-  for (const seg of ARTERY_SEGMENTS) {
-    assert.equal(getSyntaxSegmentCode(seg, 'right'), expectedRight[seg], `${seg} right`);
-    assert.ok(formatArteryLabel(seg, 'right', 'syntax').startsWith(`SYNTAX ${expectedRight[seg]}`), seg);
-  }
-  assert.equal(getSyntaxSegmentCode('PDA', 'left'), '15');
-  assert.equal(getSyntaxSegmentCode('PLB', 'left'), '14');
-  assert.ok(formatArteryLabel('PDA', 'left', 'syntax').startsWith('SYNTAX 15'));
-  assert.ok(formatArteryLabel('PLB', 'left', 'syntax').startsWith('SYNTAX 14'));
-
+test('Коллатерали Rentrop (ретроградный градиент и донорский бассейн) согласованы', () => {
   for (const dom of ['right', 'left']) {
     const geom = getHeartSegmentGeometry(dom);
     for (const seg of ARTERY_SEGMENTS) {

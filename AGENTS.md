@@ -69,7 +69,7 @@
 | Настроить морфологию волн (de Winter, Wellens, Sgarbossa, Brugada) | `src/core/types.ts` (`StShape`, `LeadShiftProfile`), `src/core/ecg/ecgEngine.ts` (`sampleBeatMv`, `getLeadBadge`) |
 | Изменить стадии времени или эффект ЧКВ (TIMI 3) | `src/core/ecg/ecgEngine.ts` (`STAGE_PRESETS`, `NSTEMI_STAGE_SUMMARIES`, `DE_WINTER_STAGE_SUMMARIES`, `NATURAL_KEYFRAMES`, `REPERFUSED_KEYFRAMES`, `computeStageModifiers`), `src/components/TimelineBar.tsx` |
 | Добавить отведения / поменять сетку бумаги или калипер | `src/components/EcgPaper.tsx`, `src/core/ecg/ecgEngine.ts` (`NORMAL_LEAD_BASE`) |
-| Изменить 3D-проекции КАГ, ПКМ-панорамирование, коллатерали Rentrop или подписи/SYNTAX | `src/data/angiographyProjections.ts`, `src/utils/cArmMath.ts`, `src/components/CArmDiagram.tsx`, `src/components/Heart3D.tsx` (`ArteryLabel`, `FluoroscopyLandmarks`, `CameraRig`, `LabelMode`), `src/presentation/segmentedHeart.ts`, `src/presentation/arteryLabels.ts` |
+| Изменить 3D-проекции КАГ, ПКМ-панорамирование, коллатерали Rentrop, ориентиры или подписи | `src/data/angiographyProjections.ts`, `src/utils/cArmMath.ts`, `src/components/CArmDiagram.tsx`, `src/components/Heart3D.tsx` (`ArteryLabel`, `FluoroscopyLandmarks`, `CameraRig`, `LabelMode`), `src/presentation/segmentedHeart.ts`, `src/presentation/arteryLabels.ts` |
 | Заменить 3D-модель сердца (напр., `.glb` из Houdini) | `public/models/heart/`, `src/components/Heart3D.tsx` (см. `docs/3D_MODEL.md`) |
 | Обновить сборку Windows `.exe` (Electron) | `electron/main.cjs`, `package.json` (`build`, `scripts`), `build/icon.ico` (см. `docs/DESKTOP_BUILD.md`) |
 

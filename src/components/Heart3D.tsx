@@ -11,7 +11,7 @@ import {
 } from '../presentation/segmentedHeart';
 import { getHeartSegmentGeometry } from '../presentation/heartSegmentGeometry';
 import { getHeartLandmarks } from '../presentation/heartLandmarks';
-import { formatArteryLabel, type LabelNotation } from '../presentation/arteryLabels';
+import { ARTERY_LABELS } from '../presentation/arteryLabels';
 import React, {
   Component,
   Suspense,
@@ -311,20 +311,12 @@ function CameraRig({
   return null;
 }
 
-interface OstiaGeometry {
-  lcaPos: THREE.Vector3;
-  lcaDir: THREE.Vector3;
-  rcaPos: THREE.Vector3;
-  rcaDir: THREE.Vector3;
-}
-
 interface HeartSceneProps extends Heart3DProps {
   viewMode: ViewMode;
   angioSystem: AngioSystem;
   showDistalGhost: boolean;
   bolusNonce: number;
   labelMode: LabelMode;
-  labelNotation: LabelNotation;
   rentropGrade: RentropGrade;
   showFluoroLandmarks: boolean;
   onLoaded: () => void;
@@ -399,51 +391,61 @@ function setupArteryMesh(mesh: THREE.Mesh, meshName: string, dominance: Dominanc
 
 const VERTEBRA_Y_POSITIONS = [-1.55, -1.1, -0.65, -0.2, 0.25, 0.7, 1.15, 1.6];
 
-const FluoroscopyLandmarks: React.FC<{
-  ostia: OstiaGeometry | null;
-  angioSystem: AngioSystem;
-}> = React.memo(({ ostia, angioSystem }) => {
-  const catheterGeometries = useMemo(() => {
-    if (!ostia) return null;
-
-    const lcaPre = ostia.lcaPos.clone().addScaledVector(ostia.lcaDir, -0.15);
-    const lcaCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0.24, -1.7, -1.35),
-      new THREE.Vector3(0.22, 0.2, -1.08),
-      new THREE.Vector3(0.08, 1.32, -0.45),
-      new THREE.Vector3(ostia.lcaPos.x - 0.14, ostia.lcaPos.y + 0.46, ostia.lcaPos.z - 0.1),
-      lcaPre,
-      ostia.lcaPos.clone(),
-    ]);
-
-    const rcaPre = ostia.rcaPos.clone().addScaledVector(ostia.rcaDir, -0.15);
-    const rcaCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0.2, -1.7, -1.38),
-      new THREE.Vector3(0.18, 0.18, -1.1),
-      new THREE.Vector3(0.02, 1.28, -0.48),
-      new THREE.Vector3(ostia.rcaPos.x + 0.14, ostia.rcaPos.y + 0.44, ostia.rcaPos.z - 0.12),
-      rcaPre,
-      ostia.rcaPos.clone(),
-    ]);
-
-    return {
-      lca: new THREE.TubeGeometry(lcaCurve, 44, 0.013, 8, false),
-      rca: new THREE.TubeGeometry(rcaCurve, 44, 0.013, 8, false),
-    };
-  }, [ostia]);
+const FluoroscopyLandmarks: React.FC = React.memo(() => {
+  const lungGeometry = useMemo(() => {
+    const profile = [
+      new THREE.Vector2(0.0, -1.02),
+      new THREE.Vector2(0.42, -1.06),
+      new THREE.Vector2(0.92, -1.15),
+      new THREE.Vector2(0.96, -0.55),
+      new THREE.Vector2(0.86, 0.2),
+      new THREE.Vector2(0.62, 0.85),
+      new THREE.Vector2(0.34, 1.2),
+      new THREE.Vector2(0.0, 1.35),
+    ];
+    return new THREE.LatheGeometry(profile, 24);
+  }, []);
 
   useEffect(() => {
     return () => {
-      catheterGeometries?.lca.dispose();
-      catheterGeometries?.rca.dispose();
+      lungGeometry.dispose();
     };
-  }, [catheterGeometries]);
-
-  const showLca = angioSystem === 'LCA' || angioSystem === 'BOTH';
-  const showRca = angioSystem === 'RCA' || angioSystem === 'BOTH';
+  }, [lungGeometry]);
 
   return (
     <group>
+      {/* Рентгеновский силуэт правого и левого лёгочного поля (светлые воздушные поля позади реберной дуги) */}
+      <mesh
+        geometry={lungGeometry}
+        position={[-1.48, 0.12, -0.35]}
+        scale={[0.88, 1.0, 0.82]}
+        renderOrder={-1}
+      >
+        <meshStandardMaterial
+          color="#f4f8fc"
+          roughness={0.95}
+          metalness={0}
+          transparent
+          opacity={0.34}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh
+        geometry={lungGeometry}
+        position={[1.55, 0.08, -0.35]}
+        scale={[0.8, 1.04, 0.8]}
+        renderOrder={-1}
+      >
+        <meshStandardMaterial
+          color="#f4f8fc"
+          roughness={0.95}
+          metalness={0}
+          transparent
+          opacity={0.34}
+          depthWrite={false}
+        />
+      </mesh>
+
       {/* Рентгеновский силуэт грудного отдела позвоночника (сзади по центру, z < 0) */}
       <group position={[-0.05, 0, -1.65]}>
         {VERTEBRA_Y_POSITIONS.map((vy) => (
@@ -471,41 +473,9 @@ const FluoroscopyLandmarks: React.FC<{
           side={THREE.DoubleSide}
         />
       </mesh>
-
-      {/* Диагностические катетеры (JL4 в устье ЛКА, JR4 в устье ПКА) */}
-      {catheterGeometries && showLca && (
-        <mesh geometry={catheterGeometries.lca} renderOrder={6}>
-          <meshBasicMaterial color="#1e293b" transparent opacity={0.72} depthWrite={false} />
-        </mesh>
-      )}
-      {catheterGeometries && showRca && (
-        <mesh geometry={catheterGeometries.rca} renderOrder={6}>
-          <meshBasicMaterial color="#1e293b" transparent opacity={0.72} depthWrite={false} />
-        </mesh>
-      )}
     </group>
   );
 });
-
-function computeOstiaForDominance(
-  dominance: Dominance,
-  meshMap: Record<string, THREE.Mesh>
-): OstiaGeometry | null {
-  const segGeom = getHeartSegmentGeometry(dominance);
-  const lmcaMesh = meshMap.LMCA;
-  const rcaMesh = meshMap.RCA_prox;
-  if (!lmcaMesh || !rcaMesh) return null;
-
-  const lcaPos = lmcaMesh.localToWorld(new THREE.Vector3(...segGeom.LMCA.entry));
-  const lcaEnd = lmcaMesh.localToWorld(new THREE.Vector3(...segGeom.LMCA.end));
-  const lcaDir = lcaEnd.sub(lcaPos).normalize();
-
-  const rcaPos = rcaMesh.localToWorld(new THREE.Vector3(...segGeom.RCA_prox.entry));
-  const rcaEnd = rcaMesh.localToWorld(new THREE.Vector3(...segGeom.RCA_prox.end));
-  const rcaDir = rcaEnd.sub(rcaPos).normalize();
-
-  return { lcaPos, lcaDir, rcaPos, rcaDir };
-}
 
 function computeLandmarksForDominance(
   dominance: Dominance,
@@ -573,7 +543,6 @@ function HeartSceneContent({
   showDistalGhost,
   bolusNonce,
   labelMode,
-  labelNotation,
   rentropGrade,
   showFluoroLandmarks,
   onLoaded,
@@ -582,10 +551,6 @@ function HeartSceneContent({
   const [landmarksByDominance, setLandmarksByDominance] = useState<Record<Dominance, LandmarkWorldPos[]>>({
     right: [],
     left: [],
-  });
-  const [ostiaByDominance, setOstiaByDominance] = useState<Record<Dominance, OstiaGeometry | null>>({
-    right: null,
-    left: null,
   });
   const [hoveredCase, setHoveredCase] = useState<CaseId | null>(null);
   const thrombusRef = useRef<THREE.Mesh>(null);
@@ -718,8 +683,6 @@ function HeartSceneContent({
 
         const rightLandmarks = computeLandmarksForDominance('right', rightMeshes);
         const leftLandmarks = computeLandmarksForDominance('left', leftMeshes);
-        const rightOstia = computeOstiaForDominance('right', rightMeshes);
-        const leftOstia = computeOstiaForDominance('left', leftMeshes);
 
         loadedWrapper = wrapper;
         bodyMeshRef.current = bodyMesh;
@@ -729,7 +692,6 @@ function HeartSceneContent({
         arteryInLcaByDominanceRef.current = { right: rightInLca, left: leftInLca };
 
         setLandmarksByDominance({ right: rightLandmarks, left: leftLandmarks });
-        setOstiaByDominance({ right: rightOstia, left: leftOstia });
         setModelGroup(wrapper);
         onLoadedRef.current();
       })
@@ -955,12 +917,7 @@ function HeartSceneContent({
     <group>
       <primitive object={modelGroup} />
 
-      {viewMode === 'angio' && showFluoroLandmarks && (
-        <FluoroscopyLandmarks
-          ostia={ostiaByDominance[dominance]}
-          angioSystem={angioSystem}
-        />
-      )}
+      {viewMode === 'angio' && showFluoroLandmarks && <FluoroscopyLandmarks />}
 
       {activeLandmarks.map((lm) => {
         const isActive = lm.caseId === activeCaseId;
@@ -1123,11 +1080,7 @@ function HeartSceneContent({
               (labelMode === 'active' && (isActive || isHovered))) && (
               <ArteryLabel
                 worldPos={effectiveWorldPos}
-                text={`${formatArteryLabel(
-                  isActive && isLeftDominantNstemiInf ? 'LCx' : landmarkDefs[lm.caseId]!.mesh,
-                  dominance,
-                  labelNotation
-                )}${angioStatusSuffix}`}
+                text={`${ARTERY_LABELS[isActive && isLeftDominantNstemiInf ? 'LCx' : landmarkDefs[lm.caseId]!.mesh].shortRu}${angioStatusSuffix}`}
                 className={`whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold shadow-md transition-colors ${
                   isActive
                     ? reperfused
@@ -1230,22 +1183,12 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
   const [instantMove, setInstantMove] = useState(false);
 
   const [labelMode, setLabelMode] = useState<LabelMode>('active');
-  const [labelNotation, setLabelNotation] = useState<LabelNotation>('anatomy');
   const [rentropGrade, setRentropGrade] = useState<RentropGrade>(0);
   const [showFluoroLandmarks, setShowFluoroLandmarks] = useState(true);
   const cycleLabelMode = useCallback(() => {
     setLabelMode((prev) =>
       prev === 'active' ? 'off' : prev === 'off' ? 'all' : 'active'
     );
-  }, []);
-  const toggleLabelNotation = useCallback(() => {
-    setLabelNotation((prev) => {
-      const next = prev === 'anatomy' ? 'syntax' : 'anatomy';
-      if (next === 'syntax') {
-        setLabelMode((m) => (m === 'off' ? 'all' : m));
-      }
-      return next;
-    });
   }, []);
   const [showCArmHud, setShowCArmHud] = useState(true);
   const [showGuideCard, setShowGuideCard] = useState(false);
@@ -1472,7 +1415,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               <button
                 type="button"
                 onClick={() => setShowFluoroLandmarks((v) => !v)}
-                title="Показать/скрыть позвоночник, купол диафрагмы и катетер в устье"
+                title="Показать/скрыть позвоночник, лёгкие и купол диафрагмы"
                 className={`rounded-md border px-2 py-0.5 font-medium transition ${
                   showFluoroLandmarks
                     ? 'border-sky-400 bg-sky-50 text-sky-800'
@@ -1526,19 +1469,6 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               : labelMode === 'off'
                 ? 'Подписи выкл.'
                 : 'Все подписи'}
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleLabelNotation}
-            title="Переключить подписи между анатомическими названиями и нумерацией сегментов SYNTAX (1–16)"
-            className={`rounded-md border px-2 py-0.5 font-bold transition ${
-              labelNotation === 'syntax'
-                ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
-                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            SYNTAX
           </button>
 
           <button
@@ -1651,7 +1581,6 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
           showDistalGhost={showDistalGhost}
           bolusNonce={bolusNonce}
           labelMode={labelMode}
-          labelNotation={labelNotation}
           rentropGrade={rentropGrade}
           showFluoroLandmarks={showFluoroLandmarks}
           onLoaded={handleLoaded}
