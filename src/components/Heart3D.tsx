@@ -1,7 +1,17 @@
-import { ARTERY_SEGMENTS, affectedArterySegments, isLeftCoronarySegment, segmentContrastDistance, type ArterySegment } from '../presentation/segmentedHeart';
+import {
+  ARTERY_SEGMENTS,
+  affectedArterySegments,
+  getCollateralDonorSystem,
+  isLeftCoronarySegment,
+  RENTROP_DESCRIPTIONS,
+  type RentropGrade,
+  segmentContrastDistance,
+  segmentRetrogradeDistance,
+  type ArterySegment,
+} from '../presentation/segmentedHeart';
 import { getHeartSegmentGeometry } from '../presentation/heartSegmentGeometry';
 import { getHeartLandmarks } from '../presentation/heartLandmarks';
-import { ARTERY_LABELS } from '../presentation/arteryLabels';
+import { formatArteryLabel, type LabelNotation } from '../presentation/arteryLabels';
 import React, {
   Component,
   Suspense,
@@ -301,12 +311,22 @@ function CameraRig({
   return null;
 }
 
+interface OstiaGeometry {
+  lcaPos: THREE.Vector3;
+  lcaDir: THREE.Vector3;
+  rcaPos: THREE.Vector3;
+  rcaDir: THREE.Vector3;
+}
+
 interface HeartSceneProps extends Heart3DProps {
   viewMode: ViewMode;
   angioSystem: AngioSystem;
   showDistalGhost: boolean;
   bolusNonce: number;
   labelMode: LabelMode;
+  labelNotation: LabelNotation;
+  rentropGrade: RentropGrade;
+  showFluoroLandmarks: boolean;
   onLoaded: () => void;
 }
 
@@ -345,15 +365,26 @@ function setupArteryMesh(mesh: THREE.Mesh, meshName: string, dominance: Dominanc
   mesh.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
 
   const dists = new Float32Array(posAttr.count);
+  const retroDists = new Float32Array(posAttr.count);
   const inLcaFlags = new Uint8Array(posAttr.count);
   const isLcaMesh = isLeftCoronarySegment(meshName);
 
   for (let i = 0; i < posAttr.count; i++) {
+    const x = posAttr.getX(i);
+    const y = posAttr.getY(i);
+    const z = posAttr.getZ(i);
     dists[i] = segmentContrastDistance(
       meshName as ArterySegment,
-      posAttr.getX(i),
-      posAttr.getY(i),
-      posAttr.getZ(i),
+      x,
+      y,
+      z,
+      dominance
+    );
+    retroDists[i] = segmentRetrogradeDistance(
+      meshName as ArterySegment,
+      x,
+      y,
+      z,
       dominance
     );
     inLcaFlags[i] = isLcaMesh ? 1 : 0;
@@ -363,7 +394,117 @@ function setupArteryMesh(mesh: THREE.Mesh, meshName: string, dominance: Dominanc
   mesh.userData.angioMat = angioMat;
   mesh.material = anatMat;
 
-  return { dists, inLcaFlags };
+  return { dists, retroDists, inLcaFlags };
+}
+
+const VERTEBRA_Y_POSITIONS = [-1.55, -1.1, -0.65, -0.2, 0.25, 0.7, 1.15, 1.6];
+
+const FluoroscopyLandmarks: React.FC<{
+  ostia: OstiaGeometry | null;
+  angioSystem: AngioSystem;
+}> = React.memo(({ ostia, angioSystem }) => {
+  const catheterGeometries = useMemo(() => {
+    if (!ostia) return null;
+
+    const lcaPre = ostia.lcaPos.clone().addScaledVector(ostia.lcaDir, -0.15);
+    const lcaCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0.24, -1.7, -1.35),
+      new THREE.Vector3(0.22, 0.2, -1.08),
+      new THREE.Vector3(0.08, 1.32, -0.45),
+      new THREE.Vector3(ostia.lcaPos.x - 0.14, ostia.lcaPos.y + 0.46, ostia.lcaPos.z - 0.1),
+      lcaPre,
+      ostia.lcaPos.clone(),
+    ]);
+
+    const rcaPre = ostia.rcaPos.clone().addScaledVector(ostia.rcaDir, -0.15);
+    const rcaCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0.2, -1.7, -1.38),
+      new THREE.Vector3(0.18, 0.18, -1.1),
+      new THREE.Vector3(0.02, 1.28, -0.48),
+      new THREE.Vector3(ostia.rcaPos.x + 0.14, ostia.rcaPos.y + 0.44, ostia.rcaPos.z - 0.12),
+      rcaPre,
+      ostia.rcaPos.clone(),
+    ]);
+
+    return {
+      lca: new THREE.TubeGeometry(lcaCurve, 44, 0.013, 8, false),
+      rca: new THREE.TubeGeometry(rcaCurve, 44, 0.013, 8, false),
+    };
+  }, [ostia]);
+
+  useEffect(() => {
+    return () => {
+      catheterGeometries?.lca.dispose();
+      catheterGeometries?.rca.dispose();
+    };
+  }, [catheterGeometries]);
+
+  const showLca = angioSystem === 'LCA' || angioSystem === 'BOTH';
+  const showRca = angioSystem === 'RCA' || angioSystem === 'BOTH';
+
+  return (
+    <group>
+      {/* Рентгеновский силуэт грудного отдела позвоночника (сзади по центру, z < 0) */}
+      <group position={[-0.05, 0, -1.65]}>
+        {VERTEBRA_Y_POSITIONS.map((vy) => (
+          <group key={vy} position={[0, vy, 0]}>
+            <mesh renderOrder={0}>
+              <cylinderGeometry args={[0.3, 0.3, 0.34, 14]} />
+              <meshBasicMaterial color="#475569" transparent opacity={0.13} depthWrite={false} />
+            </mesh>
+            <mesh position={[0, -0.04, -0.34]} renderOrder={0}>
+              <boxGeometry args={[0.09, 0.22, 0.26]} />
+              <meshBasicMaterial color="#334155" transparent opacity={0.11} depthWrite={false} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+
+      {/* Силуэт правого/центрального купола диафрагмы под нижней стенкой сердца */}
+      <mesh position={[-0.22, -2.28, -0.15]} scale={[1.05, 0.36, 0.85]} renderOrder={0}>
+        <sphereGeometry args={[2.5, 28, 12, 0, Math.PI * 2, 0, Math.PI * 0.36]} />
+        <meshBasicMaterial
+          color="#64748b"
+          transparent
+          opacity={0.12}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Диагностические катетеры (JL4 в устье ЛКА, JR4 в устье ПКА) */}
+      {catheterGeometries && showLca && (
+        <mesh geometry={catheterGeometries.lca} renderOrder={6}>
+          <meshBasicMaterial color="#1e293b" transparent opacity={0.72} depthWrite={false} />
+        </mesh>
+      )}
+      {catheterGeometries && showRca && (
+        <mesh geometry={catheterGeometries.rca} renderOrder={6}>
+          <meshBasicMaterial color="#1e293b" transparent opacity={0.72} depthWrite={false} />
+        </mesh>
+      )}
+    </group>
+  );
+});
+
+function computeOstiaForDominance(
+  dominance: Dominance,
+  meshMap: Record<string, THREE.Mesh>
+): OstiaGeometry | null {
+  const segGeom = getHeartSegmentGeometry(dominance);
+  const lmcaMesh = meshMap.LMCA;
+  const rcaMesh = meshMap.RCA_prox;
+  if (!lmcaMesh || !rcaMesh) return null;
+
+  const lcaPos = lmcaMesh.localToWorld(new THREE.Vector3(...segGeom.LMCA.entry));
+  const lcaEnd = lmcaMesh.localToWorld(new THREE.Vector3(...segGeom.LMCA.end));
+  const lcaDir = lcaEnd.sub(lcaPos).normalize();
+
+  const rcaPos = rcaMesh.localToWorld(new THREE.Vector3(...segGeom.RCA_prox.entry));
+  const rcaEnd = rcaMesh.localToWorld(new THREE.Vector3(...segGeom.RCA_prox.end));
+  const rcaDir = rcaEnd.sub(rcaPos).normalize();
+
+  return { lcaPos, lcaDir, rcaPos, rcaDir };
 }
 
 function computeLandmarksForDominance(
@@ -432,12 +573,19 @@ function HeartSceneContent({
   showDistalGhost,
   bolusNonce,
   labelMode,
+  labelNotation,
+  rentropGrade,
+  showFluoroLandmarks,
   onLoaded,
 }: HeartSceneProps) {
   const [modelGroup, setModelGroup] = useState<THREE.Group | null>(null);
   const [landmarksByDominance, setLandmarksByDominance] = useState<Record<Dominance, LandmarkWorldPos[]>>({
     right: [],
     left: [],
+  });
+  const [ostiaByDominance, setOstiaByDominance] = useState<Record<Dominance, OstiaGeometry | null>>({
+    right: null,
+    left: null,
   });
   const [hoveredCase, setHoveredCase] = useState<CaseId | null>(null);
   const thrombusRef = useRef<THREE.Mesh>(null);
@@ -451,6 +599,10 @@ function HeartSceneContent({
     right: {},
     left: {},
   });
+  const arteryRetroDistByDominanceRef = useRef<Record<Dominance, Record<string, Float32Array>>>({
+    right: {},
+    left: {},
+  });
   const arteryInLcaByDominanceRef = useRef<Record<Dominance, Record<string, Uint8Array>>>({
     right: {},
     left: {},
@@ -460,7 +612,7 @@ function HeartSceneContent({
   const onLoadedRef = useRef(onLoaded);
   onLoadedRef.current = onLoaded;
 
-  const bolusProgressRef = useRef<number>(1.2);
+  const bolusProgressRef = useRef<number>(2.1);
   const bolusAnimatingRef = useRef<boolean>(false);
 
   // Загрузка обоих сегментированных GLB (правый + левый типы) строго 1 раз + полный dispose при размонтировании
@@ -487,6 +639,7 @@ function HeartSceneContent({
 
         const rightMeshes: Record<string, THREE.Mesh> = {};
         const rightDists: Record<string, Float32Array> = {};
+        const rightRetroDists: Record<string, Float32Array> = {};
         const rightInLca: Record<string, Uint8Array> = {};
         let bodyMesh: THREE.Mesh | null = null;
 
@@ -498,8 +651,9 @@ function HeartSceneContent({
 
             if (ARTERY_NAMES.includes(meshName)) {
               rightMeshes[meshName] = mesh;
-              const { dists, inLcaFlags } = setupArteryMesh(mesh, meshName, 'right');
+              const { dists, retroDists, inLcaFlags } = setupArteryMesh(mesh, meshName, 'right');
               rightDists[meshName] = dists;
+              rightRetroDists[meshName] = retroDists;
               rightInLca[meshName] = inLcaFlags;
             } else {
               mesh.userData.baseColors = new Float32Array(mesh.geometry.attributes.color.array);
@@ -517,6 +671,7 @@ function HeartSceneContent({
 
         const leftMeshes: Record<string, THREE.Mesh> = {};
         const leftDists: Record<string, Float32Array> = {};
+        const leftRetroDists: Record<string, Float32Array> = {};
         const leftInLca: Record<string, Uint8Array> = {};
 
         leftScene.traverse((child) => {
@@ -527,8 +682,9 @@ function HeartSceneContent({
 
             if (ARTERY_NAMES.includes(meshName)) {
               leftMeshes[meshName] = mesh;
-              const { dists, inLcaFlags } = setupArteryMesh(mesh, meshName, 'left');
+              const { dists, retroDists, inLcaFlags } = setupArteryMesh(mesh, meshName, 'left');
               leftDists[meshName] = dists;
+              leftRetroDists[meshName] = retroDists;
               leftInLca[meshName] = inLcaFlags;
               mesh.visible = false;
             } else {
@@ -562,14 +718,18 @@ function HeartSceneContent({
 
         const rightLandmarks = computeLandmarksForDominance('right', rightMeshes);
         const leftLandmarks = computeLandmarksForDominance('left', leftMeshes);
+        const rightOstia = computeOstiaForDominance('right', rightMeshes);
+        const leftOstia = computeOstiaForDominance('left', leftMeshes);
 
         loadedWrapper = wrapper;
         bodyMeshRef.current = bodyMesh;
         arteryMeshesByDominanceRef.current = { right: rightMeshes, left: leftMeshes };
         arteryDistByDominanceRef.current = { right: rightDists, left: leftDists };
+        arteryRetroDistByDominanceRef.current = { right: rightRetroDists, left: leftRetroDists };
         arteryInLcaByDominanceRef.current = { right: rightInLca, left: leftInLca };
 
         setLandmarksByDominance({ right: rightLandmarks, left: leftLandmarks });
+        setOstiaByDominance({ right: rightOstia, left: leftOstia });
         setModelGroup(wrapper);
         onLoadedRef.current();
       })
@@ -629,8 +789,24 @@ function HeartSceneContent({
     (bolusWave: number) => {
       const meshes = arteryMeshesByDominanceRef.current[dominance];
       const distMap = arteryDistByDominanceRef.current[dominance];
+      const retroMap = arteryRetroDistByDominanceRef.current[dominance];
       const inLcaMap = arteryInLcaByDominanceRef.current[dominance];
       const affected = affectedArterySegments(activeCaseId, dominance);
+      const donorSystem = getCollateralDonorSystem(activeCaseId, dominance);
+      const collateralsActive =
+        viewMode === 'angio' &&
+        rentropGrade > 0 &&
+        lesionType === 'occlusion' &&
+        !reperfused &&
+        donorSystem !== null &&
+        (angioSystem === 'BOTH' || angioSystem === donorSystem);
+
+      const collateralParams =
+        rentropGrade === 1
+          ? { maxReach: 0.28, alpha: 0.26, delay: 0.72 }
+          : rentropGrade === 2
+            ? { maxReach: 0.64, alpha: 0.52, delay: 0.62 }
+            : { maxReach: 1.0, alpha: 0.8, delay: 0.54 };
 
       for (const artName of ARTERY_NAMES) {
         const mesh = meshes[artName];
@@ -638,6 +814,7 @@ function HeartSceneContent({
         const colAttr = mesh.geometry.attributes.color as THREE.BufferAttribute;
         const posAttr = mesh.geometry.attributes.position;
         const dists = distMap[artName];
+        const retroDists = retroMap[artName];
         const inLcaFlags = inLcaMap[artName];
 
         for (let i = 0; i < posAttr.count; i++) {
@@ -663,7 +840,7 @@ function HeartSceneContent({
               (angioSystem === 'LCA' && inLca) ||
               (angioSystem === 'RCA' && !inLca);
 
-            if (!selectedSystem) {
+            if (!selectedSystem && !(distal && collateralsActive)) {
               colAttr.setXYZW(i, 0.35, 0.38, 0.42, 0.03);
               continue;
             }
@@ -690,6 +867,14 @@ function HeartSceneContent({
                 );
               } else if (lesionType === 'stenosis') {
                 colAttr.setXYZW(i, 0.1, 0.12, 0.16, reachedByBolus ? 0.78 : 0.08);
+              } else if (collateralsActive) {
+                const rDist = retroDists ? retroDists[i] : 1;
+                const retroProgress = Math.max(0, (bolusWave - collateralParams.delay) * 0.85);
+                if (rDist <= collateralParams.maxReach && rDist <= retroProgress) {
+                  colAttr.setXYZW(i, 0.12, 0.15, 0.2, collateralParams.alpha);
+                } else {
+                  colAttr.setXYZW(i, 0.28, 0.3, 0.36, showDistalGhost ? 0.14 : 0.0);
+                }
               } else {
                 colAttr.setXYZW(i, 0.28, 0.3, 0.36, showDistalGhost ? 0.14 : 0.0);
               }
@@ -703,7 +888,7 @@ function HeartSceneContent({
         colAttr.needsUpdate = true;
       }
     },
-    [activeCaseId, dominance, reperfused, lesionType, viewMode, angioSystem, showDistalGhost]
+    [activeCaseId, dominance, reperfused, lesionType, viewMode, angioSystem, showDistalGhost, rentropGrade]
   );
 
   useEffect(() => {
@@ -715,7 +900,7 @@ function HeartSceneContent({
   // Пересчёт цветов вне кадра; в useFrame допускается только короткая анимация болюса.
   useEffect(() => {
     if (!modelGroup) return;
-    applyArteryColors(bolusAnimatingRef.current ? bolusProgressRef.current : 1.2);
+    applyArteryColors(bolusAnimatingRef.current ? bolusProgressRef.current : 2.1);
   }, [
     modelGroup,
     activeCaseId,
@@ -724,6 +909,7 @@ function HeartSceneContent({
     reperfused,
     viewMode,
     dominance,
+    rentropGrade,
     applyArteryColors,
   ]);
 
@@ -744,9 +930,10 @@ function HeartSceneContent({
     if (bolusAnimatingRef.current && viewMode === 'angio' && modelGroup) {
       bolusProgressRef.current += delta * 0.65;
       applyArteryColors(bolusProgressRef.current);
-      if (bolusProgressRef.current >= 1.15) {
+      const maxWave = rentropGrade > 0 ? 1.95 : 1.15;
+      if (bolusProgressRef.current >= maxWave) {
         bolusAnimatingRef.current = false;
-        applyArteryColors(1.2);
+        applyArteryColors(2.1);
       }
     }
   });
@@ -767,6 +954,13 @@ function HeartSceneContent({
   return (
     <group>
       <primitive object={modelGroup} />
+
+      {viewMode === 'angio' && showFluoroLandmarks && (
+        <FluoroscopyLandmarks
+          ostia={ostiaByDominance[dominance]}
+          angioSystem={angioSystem}
+        />
+      )}
 
       {activeLandmarks.map((lm) => {
         const isActive = lm.caseId === activeCaseId;
@@ -929,7 +1123,11 @@ function HeartSceneContent({
               (labelMode === 'active' && (isActive || isHovered))) && (
               <ArteryLabel
                 worldPos={effectiveWorldPos}
-                text={`${ARTERY_LABELS[isActive && isLeftDominantNstemiInf ? 'LCx' : landmarkDefs[lm.caseId]!.mesh].shortRu}${angioStatusSuffix}`}
+                text={`${formatArteryLabel(
+                  isActive && isLeftDominantNstemiInf ? 'LCx' : landmarkDefs[lm.caseId]!.mesh,
+                  dominance,
+                  labelNotation
+                )}${angioStatusSuffix}`}
                 className={`whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold shadow-md transition-colors ${
                   isActive
                     ? reperfused
@@ -1032,10 +1230,22 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
   const [instantMove, setInstantMove] = useState(false);
 
   const [labelMode, setLabelMode] = useState<LabelMode>('active');
+  const [labelNotation, setLabelNotation] = useState<LabelNotation>('anatomy');
+  const [rentropGrade, setRentropGrade] = useState<RentropGrade>(0);
+  const [showFluoroLandmarks, setShowFluoroLandmarks] = useState(true);
   const cycleLabelMode = useCallback(() => {
     setLabelMode((prev) =>
       prev === 'active' ? 'off' : prev === 'off' ? 'all' : 'active'
     );
+  }, []);
+  const toggleLabelNotation = useCallback(() => {
+    setLabelNotation((prev) => {
+      const next = prev === 'anatomy' ? 'syntax' : 'anatomy';
+      if (next === 'syntax') {
+        setLabelMode((m) => (m === 'off' ? 'all' : m));
+      }
+      return next;
+    });
   }, []);
   const [showCArmHud, setShowCArmHud] = useState(true);
   const [showGuideCard, setShowGuideCard] = useState(false);
@@ -1137,6 +1347,29 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
   const optimalProjTitle = PROJECTION_MAP[optimalInfo.projectionId].shortLabel;
 
   const activeLesionType = CORONARY_CASES[props.activeCaseId].lesionType;
+  const donorSystem = useMemo(
+    () => getCollateralDonorSystem(props.activeCaseId, props.dominance),
+    [props.activeCaseId, props.dominance]
+  );
+
+  useEffect(() => {
+    if (activeLesionType !== 'occlusion' || props.reperfused) {
+      setRentropGrade(0);
+    }
+  }, [activeLesionType, props.reperfused]);
+
+  const cycleRentropGrade = useCallback(() => {
+    setRentropGrade((prev) => {
+      const next = (((prev + 1) % 4) as RentropGrade);
+      if (next > 0) {
+        if (donorSystem && angioSystem !== 'BOTH' && angioSystem !== donorSystem) {
+          setAngioSystem('BOTH');
+        }
+        setBolusNonce((n) => n + 1);
+      }
+      return next;
+    });
+  }, [angioSystem, donorSystem]);
 
   const compareTable = activeProjInfo.compareGroup
     ? PROJECTION_COMPARE_TABLES[activeProjInfo.compareGroup]
@@ -1236,6 +1469,32 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               >
                 Контур дист.
               </button>
+              <button
+                type="button"
+                onClick={() => setShowFluoroLandmarks((v) => !v)}
+                title="Показать/скрыть позвоночник, купол диафрагмы и катетер в устье"
+                className={`rounded-md border px-2 py-0.5 font-medium transition ${
+                  showFluoroLandmarks
+                    ? 'border-sky-400 bg-sky-50 text-sky-800'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Ориентиры
+              </button>
+              {activeLesionType === 'occlusion' && !props.reperfused && (
+                <button
+                  type="button"
+                  onClick={cycleRentropGrade}
+                  title={`${RENTROP_DESCRIPTIONS[rentropGrade].short}: ${RENTROP_DESCRIPTIONS[rentropGrade].detail}`}
+                  className={`rounded-md border px-2 py-0.5 font-semibold transition ${
+                    rentropGrade > 0
+                      ? 'border-amber-500 bg-amber-100 text-amber-900 shadow-sm'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {RENTROP_DESCRIPTIONS[rentropGrade].short}
+                </button>
+              )}
             </>
           ) : null}
 
@@ -1267,6 +1526,19 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               : labelMode === 'off'
                 ? 'Подписи выкл.'
                 : 'Все подписи'}
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleLabelNotation}
+            title="Переключить подписи между анатомическими названиями и нумерацией сегментов SYNTAX (1–16)"
+            className={`rounded-md border px-2 py-0.5 font-bold transition ${
+              labelNotation === 'syntax'
+                ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            SYNTAX
           </button>
 
           <button
@@ -1320,7 +1592,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
           <div
             className={`rounded-lg border px-2.5 py-1.5 ${
               viewMode === 'angio'
-                ? 'border-slate-600/80 bg-slate-900/92 text-slate-100 shadow-lg'
+                ? 'border-slate-600/80 bg-slate-900/95 text-slate-100 shadow-lg'
                 : 'border-slate-200 bg-white/95 text-slate-800 shadow-sm'
             }`}
           >
@@ -1344,6 +1616,15 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                 <span className="opacity-70">Произвольный угол</span>
               )}
             </div>
+            {viewMode === 'angio' &&
+              rentropGrade > 0 &&
+              activeLesionType === 'occlusion' &&
+              !props.reperfused && (
+                <div className="mt-0.5 text-[10px] font-semibold text-amber-300">
+                  Коллатерали: Rentrop {rentropGrade} (донор:{' '}
+                  {donorSystem === 'RCA' ? 'ПКА' : 'ЛКА'})
+                </div>
+              )}
           </div>
         </div>
 
@@ -1370,6 +1651,9 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
           showDistalGhost={showDistalGhost}
           bolusNonce={bolusNonce}
           labelMode={labelMode}
+          labelNotation={labelNotation}
+          rentropGrade={rentropGrade}
+          showFluoroLandmarks={showFluoroLandmarks}
           onLoaded={handleLoaded}
           targetAngles={targetAngles}
           commandNonce={commandNonce}

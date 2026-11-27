@@ -25,6 +25,27 @@ export function affectedArterySegments(caseId: CaseId, dominance: Dominance): re
   }
 }
 
+export type RentropGrade = 0 | 1 | 2 | 3;
+
+export const RENTROP_DESCRIPTIONS: Record<RentropGrade, { short: string; detail: string }> = {
+  0: {
+    short: 'Rentrop 0',
+    detail: 'Без коллатерального заполнения дистального русла.',
+  },
+  1: {
+    short: 'Rentrop 1',
+    detail: 'Заполнение только мелких боковых ветвей без эпикардиального ствола.',
+  },
+  2: {
+    short: 'Rentrop 2',
+    detail: 'Частичное ретроградное заполнение эпикардиального сегмента окклюзированной артерии.',
+  },
+  3: {
+    short: 'Rentrop 3',
+    detail: 'Полное ретроградное заполнение дистального русла до дистальной шапки окклюзии.',
+  },
+};
+
 /** Иллюстративное продвижение контраста по сегментам, не измерение времени кровотока. */
 export function segmentContrastDistance(name: ArterySegment, x: number, y: number, z: number, dominance: Dominance): number {
   const { entry, end } = getHeartSegmentGeometry(dominance)[name];
@@ -35,4 +56,19 @@ export function segmentContrastDistance(name: ArterySegment, x: number, y: numbe
   const width = name === 'LMCA' ? .12 : name === 'LCx' ? .55 : .3;
   const offset = dominance === 'left' && (name === 'PDA' || name === 'PLB') ? .62 : start[name];
   return Math.min(1, offset + t * width);
+}
+
+/** Относительное ретроградное расстояние (0 на периферии сегмента -> 1 у проксимального входа). */
+export function segmentRetrogradeDistance(name: ArterySegment, x: number, y: number, z: number, dominance: Dominance): number {
+  const dAntegrade = segmentContrastDistance(name, x, y, z, dominance);
+  return Math.max(0, Math.min(1, 1 - dAntegrade));
+}
+
+/** Контрлатеральный бассейн-донор для межсистемного коллатерального заполнения при окклюзии. */
+export function getCollateralDonorSystem(caseId: CaseId, dominance: Dominance): 'LCA' | 'RCA' | null {
+  const affected = affectedArterySegments(caseId, dominance);
+  if (affected.length === 0) return null;
+  const seg = affected[0];
+  const isLca = (seg === 'PDA' || seg === 'PLB') ? dominance === 'left' : isLeftCoronarySegment(seg);
+  return isLca ? 'RCA' : 'LCA';
 }

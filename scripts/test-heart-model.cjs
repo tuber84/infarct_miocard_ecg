@@ -10,7 +10,18 @@ require.extensions['.ts'] = (module, filename) => {
   }).outputText, filename);
 };
 const { HEART_LANDMARKS, getHeartLandmarks } = require('../src/presentation/heartLandmarks.ts');
-const { ARTERY_SEGMENTS, affectedArterySegments, segmentContrastDistance } = require('../src/presentation/segmentedHeart.ts');
+const {
+  ARTERY_SEGMENTS,
+  affectedArterySegments,
+  getCollateralDonorSystem,
+  segmentContrastDistance,
+  segmentRetrogradeDistance,
+} = require('../src/presentation/segmentedHeart.ts');
+const {
+  formatArteryLabel,
+  getSyntaxSegmentCode,
+} = require('../src/presentation/arteryLabels.ts');
+const { getHeartSegmentGeometry } = require('../src/presentation/heartSegmentGeometry.ts');
 const { CASE_ORDER, CORONARY_CASES } = require('../src/core/content/coronaryCases.ts');
 
 function getVertexKeySet(mesh) {
@@ -188,4 +199,36 @@ test('Поражения не затрагивают посторонний ба
     const dist = Math.hypot(pPda[0] - pPlb[0], pPda[1] - pPlb[1], pPda[2] - pPlb[2]);
     assert.ok(dist > 0.1, `${dom}: маркеры ЗМЖВ и ЗБВ слишком близко (${dist.toFixed(4)})`);
   }
+});
+
+test('Нумерация SYNTAX (1–16) и коллатерали Rentrop (ретроградный градиент и донорский бассейн) согласованы', () => {
+  const expectedRight = {
+    RCA_prox: '1', RCA_mid: '2', RCA_dist: '3', PDA: '4', PLB: '16',
+    LMCA: '5', LAD_prox: '6', LAD_mid: '7', LAD_dist: '8', D1: '9', D2: '10', LCx: '11/13', OM1: '12a',
+  };
+  for (const seg of ARTERY_SEGMENTS) {
+    assert.equal(getSyntaxSegmentCode(seg, 'right'), expectedRight[seg], `${seg} right`);
+    assert.ok(formatArteryLabel(seg, 'right', 'syntax').startsWith(`SYNTAX ${expectedRight[seg]}`), seg);
+  }
+  assert.equal(getSyntaxSegmentCode('PDA', 'left'), '15');
+  assert.equal(getSyntaxSegmentCode('PLB', 'left'), '14');
+  assert.ok(formatArteryLabel('PDA', 'left', 'syntax').startsWith('SYNTAX 15'));
+  assert.ok(formatArteryLabel('PLB', 'left', 'syntax').startsWith('SYNTAX 14'));
+
+  for (const dom of ['right', 'left']) {
+    const geom = getHeartSegmentGeometry(dom);
+    for (const seg of ARTERY_SEGMENTS) {
+      const { entry, end } = geom[seg];
+      const rEntry = segmentRetrogradeDistance(seg, entry[0], entry[1], entry[2], dom);
+      const rEnd = segmentRetrogradeDistance(seg, end[0], end[1], end[2], dom);
+      assert.ok(rEntry >= 0 && rEntry <= 1 && rEnd >= 0 && rEnd <= 1, `${dom}/${seg} out of [0,1]`);
+      assert.ok(rEnd <= rEntry, `${dom}/${seg}: на периферии ретроградная дистанция должна быть <= входной`);
+    }
+  }
+
+  assert.equal(getCollateralDonorSystem('lad_prox', 'right'), 'RCA');
+  assert.equal(getCollateralDonorSystem('rca_prox', 'right'), 'LCA');
+  assert.equal(getCollateralDonorSystem('pda', 'right'), 'LCA');
+  assert.equal(getCollateralDonorSystem('pda', 'left'), 'RCA');
+  assert.equal(getCollateralDonorSystem('normal', 'right'), null);
 });

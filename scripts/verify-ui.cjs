@@ -93,9 +93,36 @@ app.whenReady().then(async () => {
       check(text().includes('Учебная гипотеза'), 'Не сформирована гипотеза нижнего паттерна');
       check(text().includes('V4R'), 'Нет рекомендации оценить ПЖ');
       await click('Сброс');
+      await click('ЗМЖВ (PDA)');
+      await click('SYNTAX');
+      check(text().includes('SYNTAX 4'), 'Нет сегмента SYNTAX 4 при правом типе');
+      await click('Левый тип');
+      check(text().includes('SYNTAX 15'), 'Не обновился сегмент SYNTAX 15 при левом типе');
+      await click('Правый тип');
+      await click('SYNTAX');
+      await click('ПМЖВ прокс.');
       await click('КАГ (С-дуга)');
-      await wait(500);
+      await wait(700);
+      await click('Ориентиры');
+      await click('Ориентиры');
+      await click('Rentrop 0');
+      await click('Rentrop 1');
+      await click('Rentrop 2');
+      check(text().includes('Коллатерали: Rentrop 3'), 'Нет индикации коллатералей Rentrop 3 в HUD С-дуги');
+      await wait(900);
       await click('Центр');
+      return { scenarios: 'Переключения STEMI/ОКСбпST, SYNTAX, коллатералей Rentrop, ориентиров и режима КАГ подготовлены', readyForAngioShot: true };
+    })()`);
+    fs.writeFileSync(path.join(outputDir, 'angio-fluoro.png'), (await win.webContents.capturePage()).toPNG());
+    const finalResults = await win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms = 120) => new Promise(resolve => setTimeout(resolve, ms));
+      const check = (condition, message) => { if (!condition) throw new Error(message); };
+      const click = async (text) => {
+        const button = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === text);
+        check(button, 'Не найдена кнопка: ' + text); button.click(); await wait();
+      };
+      const text = () => document.body.innerText;
+      await click('Rentrop 3');
       await click('Анатомия 3D');
       await click('ПКА прокс.');
       await wait(800);
@@ -107,8 +134,9 @@ app.whenReady().then(async () => {
       const details = [...document.querySelectorAll('summary')].find(s => s.textContent.includes('Пороговые критерии'));
       details.click(); await wait();
       check(text().includes('≥2,5 мм'), 'Нет возрастного порога ST');
-      return { scenarios: 'Переключения STEMI/ОКСбпST, дополнительных отведений, доминирования, реперфузии, ручного ввода, сброса и режима КАГ выполнены', canvases: document.querySelectorAll('canvas').length };
+      return { scenarios: 'Переключения STEMI/ОКСбпST/Блокады, SYNTAX, Rentrop, ориентиров, дополнительных отведений, доминирования, реперфузии, ручного ввода, сброса и режима КАГ выполнены', canvases: document.querySelectorAll('canvas').length };
     })()`);
+    Object.assign(results, finalResults);
     const screenshot = await win.webContents.capturePage();
     fs.writeFileSync(path.join(outputDir, 'interface.png'), screenshot.toPNG());
     const scrollY = await win.webContents.executeJavaScript(`(async () => {
