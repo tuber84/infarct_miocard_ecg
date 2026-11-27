@@ -3,8 +3,11 @@ import { Activity, Clock, HeartPulse } from 'lucide-react';
 import {
   DE_WINTER_STAGE_SUMMARIES,
   getNearestStagePreset,
+  LBBB_SGARBOSSA_STAGE_SUMMARIES,
   NSTEMI_STAGE_SUMMARIES,
+  PERICARDITIS_STAGE_SUMMARIES,
   STAGE_PRESETS,
+  TAKOTSUBO_STAGE_SUMMARIES,
 } from '../core/ecg/ecgEngine';
 import { CaseId, LesionType, SyndromeCategory } from '../core/types';
 
@@ -30,19 +33,29 @@ const TimelineBarComponent: React.FC<TimelineBarProps> = ({
   lesionType,
 }) => {
   const nearest = getNearestStagePreset(timeline);
+  const canCompareReperfusion = isPathological && lesionType !== 'none';
   const stageSource =
     caseId === 'de_winter'
       ? DE_WINTER_STAGE_SUMMARIES[nearest.id]
-      : category === 'nstemi' && lesionType !== 'occlusion'
-        ? NSTEMI_STAGE_SUMMARIES[nearest.id]
-        : nearest;
-  const stageText = reperfused
+      : caseId === 'pericarditis'
+        ? PERICARDITIS_STAGE_SUMMARIES[nearest.id]
+        : caseId === 'takotsubo'
+          ? TAKOTSUBO_STAGE_SUMMARIES[nearest.id]
+          : caseId === 'lbbb_sgarbossa'
+            ? LBBB_SGARBOSSA_STAGE_SUMMARIES[nearest.id]
+            : category === 'nstemi' && lesionType !== 'occlusion'
+              ? NSTEMI_STAGE_SUMMARIES[nearest.id]
+              : nearest;
+  const stageText = canCompareReperfusion && reperfused
     ? stageSource.reperfusionSummary
     : stageSource.summary;
 
-  const pciButtonLabel = reperfused
-    ? 'После ранней успешной реперфузии · TIMI 3'
-    : 'Сравнить с ранней успешной реперфузией';
+  const pciButtonLabel =
+    isPathological && lesionType === 'none'
+      ? 'ЧКВ не показано (КА интактны)'
+      : reperfused
+        ? 'После ранней успешной реперфузии · TIMI 3'
+        : 'Сравнить с ранней успешной реперфузией';
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -87,17 +100,17 @@ const TimelineBarComponent: React.FC<TimelineBarProps> = ({
         {/* Тумблер ЧКВ / Реперфузия */}
         <button
           type="button"
-          disabled={!isPathological}
+          disabled={!canCompareReperfusion}
           onClick={onToggleReperfused}
           className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-            !isPathological
+            !canCompareReperfusion
               ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
               : reperfused
                 ? 'border-emerald-500 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700'
                 : 'border-red-300 bg-red-50 text-red-800 hover:bg-red-100'
           }`}
         >
-          {reperfused ? (
+          {reperfused && canCompareReperfusion ? (
             <HeartPulse className="h-4 w-4 animate-pulse" />
           ) : (
             <Activity className="h-4 w-4" />
@@ -131,7 +144,9 @@ const TimelineBarComponent: React.FC<TimelineBarProps> = ({
       {/* Клиническое пояснение фазы */}
       <p className="mt-1.5 text-xs text-slate-600">
         {!isPathological ? (
-          'Выберите патологический сценарий (ИМпST или ИМбпST) на 3D-сердце или в списке, чтобы изучить эволюцию ЭКГ и эффект ЧКВ.'
+          caseId === 'lbbb_benign' || caseId === 'early_repol'
+            ? 'Статический ЭКГ-паттерн (без инфарктной эволюции ST–T и формирования Q). При появлении ангинозной боли сравнивают с архивной плёнкой.'
+            : 'Выберите патологический сценарий (ИМпST, ИМбпST, перикардит или Такоцубо), чтобы изучить эволюцию ЭКГ во времени.'
         ) : (
           <>
             <span className="font-bold text-slate-800">

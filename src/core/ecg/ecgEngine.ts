@@ -4,6 +4,7 @@ import {
   LeadShiftProfile,
   ManualLeadState,
   MiStageId,
+  QrsPattern,
   StageModifiers,
   StagePreset,
 } from '../types';
@@ -130,6 +131,114 @@ export const DE_WINTER_STAGE_SUMMARIES: Record<
       'Учебный вариант поздних изменений: точка J на изолинии, частичная нормализация T, возможны остаточные изменения комплекса QRS; объём рубца уточняют методами визуализации.',
     reperfusionSummary:
       'Учебный вариант сравнения с ранней успешной реперфузией: меньшая потеря R и стабилизация ST–T; сам факт ЧКВ не исключает остаточного рубцового изменения.',
+  },
+};
+
+export const PERICARDITIS_STAGE_SUMMARIES: Record<
+  MiStageId,
+  { summary: string; reperfusionSummary: string }
+> = {
+  hyperacute: {
+    summary:
+      'Стадия I (начало): появление диффузной вогнутой элевации ST и депрессии сегмента PR (в aVR — зеркальный подъём PR и депрессия ST) при сохранении положительных зубцов T.',
+    reperfusionSummary:
+      'При остром перикардите коронарные артерии проходимы (TIMI 3), реперфузионная терапия не показана.',
+  },
+  acute: {
+    summary:
+      'Стадия I (разгар): классический диффузный вогнутый («седловидный») подъём ST во многих отведениях без реципрокной депрессии (кроме aVR и V1) и депрессия сегмента PR. Зубцы Q не формируются.',
+    reperfusionSummary:
+      'При остром перикардите коронарные артерии проходимы (TIMI 3), реперфузионная терапия не показана.',
+  },
+  evolving: {
+    summary:
+      'Стадия II (несколько дней): возвращение сегментов ST и PR к изолинии с уплощением зубцов T; патологический зубец Q отсутствует.',
+    reperfusionSummary:
+      'При остром перикардите коронарные артерии проходимы (TIMI 3), реперфузионная терапия не показана.',
+  },
+  subacute: {
+    summary:
+      'Стадия III: диффузная инверсия зубцов T на фоне изолинии ST (отмечается уже после нормализации ST, без потери зубца R и без Q).',
+    reperfusionSummary:
+      'При остром перикардите коронарные артерии проходимы (TIMI 3), реперфузионная терапия не показана.',
+  },
+  chronic: {
+    summary:
+      'Стадия IV (разрешение): постепенная нормализация зубцов T и возвращение ЭКГ к исходному виду без рубцового Q/QS.',
+    reperfusionSummary:
+      'При остром перикардите коронарные артерии проходимы (TIMI 3), реперфузионная терапия не показана.',
+  },
+};
+
+export const TAKOTSUBO_STAGE_SUMMARIES: Record<
+  MiStageId,
+  { summary: string; reperfusionSummary: string }
+> = {
+  hyperacute: {
+    summary:
+      'Острейшая стресс-индуцированная фаза: подъём сегмента ST в передне-боковых и нередко нижних отведениях (обычно с вовлечением V2–V6 при щадящем V1), клинически неотличимый от ИМпST до проведения КАГ.',
+    reperfusionSummary:
+      'При синдроме Такоцубо эпикардиальные коронарные артерии интактны (TIMI 3), ЧКВ не требуется.',
+  },
+  acute: {
+    summary:
+      'Острая фаза: элевация ST по передне-верхушечной и боковой стенке (иногда захватывает нижние отведения без выраженной реципрокности), V1 обычно на изолинии. Требует экстренной КАГ для исключения ИМпST.',
+    reperfusionSummary:
+      'При синдроме Такоцубо эпикардиальные коронарные артерии интактны (TIMI 3), ЧКВ не требуется.',
+  },
+  evolving: {
+    summary:
+      'Переходная фаза (24–72 ч): быстрый спад ST и формирование нарастающей глубокой симметричной инверсии T с удлинением QT без выраженного рубцового Q.',
+    reperfusionSummary:
+      'При синдроме Такоцубо эпикардиальные коронарные артерии интактны (TIMI 3), ЧКВ не требуется.',
+  },
+  subacute: {
+    summary:
+      'Подострая фаза: диффузные гигантские отрицательные зубцы T (вплоть до 8–10 мм) в V2–V6 и отведениях от конечностей при нормализации сегмента ST и обратимом апикальном баллонировании.',
+    reperfusionSummary:
+      'При синдроме Такоцубо эпикардиальные коронарные артерии интактны (TIMI 3), ЧКВ не требуется.',
+  },
+  chronic: {
+    summary:
+      'Фаза восстановления (> 1 мес): регресс инверсии T и восстановление сократимости верхушки ЛЖ без стойкого зубца Q.',
+    reperfusionSummary:
+      'При синдроме Такоцубо эпикардиальные коронарные артерии интактны (TIMI 3), ЧКВ не требуется.',
+  },
+};
+
+export const LBBB_SGARBOSSA_STAGE_SUMMARIES: Record<
+  MiStageId,
+  { summary: string; reperfusionSummary: string }
+> = {
+  hyperacute: {
+    summary:
+      'На фоне широкого QRS полной БЛНПГ (148 мс) нарастает конкордантный подъём ST в I, aVL, V5–V6 и чрезмерно дискордантный подъём в V2–V3.',
+    reperfusionSummary:
+      'Учебный вариант ранней успешной реперфузии при БЛНПГ: ограничение ишемического смещения ST с возвратом к исходной дискордантности блокады.',
+  },
+  acute: {
+    summary:
+      'Положительные критерии Сгарбосса и модифицированный критерий Смита: конкордантный ST↑ ≥ 1 мм в V5–V6, I, aVL (5 баллов) и чрезмерный дискордантный ST↑ в V2–V3 (|ST/S| > 0,25) поверх БЛНПГ.',
+    reperfusionSummary:
+      'После своевременного стентирования ПМЖВ ишемический подъём ST регрессирует, оставляя фоновую пропорциональную дискордантность БЛНПГ.',
+  },
+  evolving: {
+    summary:
+      'Эволюция ИМ на фоне БЛНПГ: острая конкордантная элевация снижается; БЛНПГ маскирует формирование патологического зубца Q в левых грудных отведениях.',
+    reperfusionSummary:
+      'После реканализации сохраняется лишь базовая дискордантность БЛНПГ; динамика ST–T стабилизируется.',
+  },
+  subacute: {
+    summary:
+      'Подострая стадия на фоне БЛНПГ: дополнительное ишемическое смещение ST уходит, преобладает вторичная дискордантная конфигурация комплекса ST–T.',
+    reperfusionSummary:
+      'Возвращение к исходному профилю неосложнённой БЛНПГ с сохранённым миокардом в бассейне ПМЖВ.',
+  },
+  chronic: {
+    summary:
+      'Поздний этап: ЭКГ определяется фоновой полной БЛНПГ; для оценки зоны постинфарктного рубца используют ЭхоКГ/МРТ.',
+    reperfusionSummary:
+      'Поздний этап после ранней реперфузии: профиль ЭКГ соответствует исходной БЛНПГ.',
   },
 };
 
@@ -465,14 +574,21 @@ export function buildManualFallbackLeads(
 }
 
 /** Единые реперы в секундах; это параметры синтетического цикла, а не автоматическая диагностика. */
-export function getBeatTiming(beatDurationSec: number, aivr = false) {
+export function getBeatTiming(
+  beatDurationSec: number,
+  aivr = false,
+  qrsPattern: QrsPattern = 'normal'
+) {
   const rateScale = clamp(Math.pow(beatDurationSec / (60 / 72), 0.35), 0.78, 1.12);
   const pOnset = 0.02;
   const pEnd = 0.12;
   const qrsOnset = pOnset + 0.162;
-  const j = qrsOnset + (aivr ? 0.144 : 0.088);
-  const tEnd = qrsOnset + 0.375 * rateScale;
-  const tOnset = j + 0.060 * rateScale;
+  const isLbbb = !aivr && qrsPattern === 'lbbb';
+  const qrsDuration = aivr ? 0.144 : isLbbb ? 0.148 : 0.088;
+  const j = qrsOnset + qrsDuration;
+  const baseQt = isLbbb ? 0.43 : 0.375;
+  const tEnd = qrsOnset + baseQt * rateScale;
+  const tOnset = j + (isLbbb ? 0.048 : 0.06) * rateScale;
   const tPeak = tOnset + (tEnd - tOnset) * 0.55;
   return { pOnset, pEnd, qrsOnset, j, tOnset, tPeak, tEnd, rateScale };
 }
@@ -484,10 +600,11 @@ export function getEffectiveHeartRate(heartRate: number, aivr: boolean): number 
 /** Смещение итоговой кривой в J относительно нулевой изолинии, в мм при 10 мм/мВ. */
 export function getJShiftMm(profile: LeadShiftProfile | undefined, stage: StageModifiers): number {
   if (!profile) return 0;
+  if (profile.fixedSt) return (profile.baseStMm ?? 0) + profile.stMm;
   const factor = profile.deWinterT ? stage.deWinterFactor
     : profile.isSubendocardial ? stage.subendoStFactor
       : profile.isReciprocal ? stage.reciprocalFactor : stage.stFactor;
-  return profile.stMm * factor;
+  return (profile.baseStMm ?? 0) + profile.stMm * factor;
 }
 
 /** Ограниченная волна с точными началом и концом, без гауссовых хвостов. */
@@ -506,6 +623,29 @@ export function sampleBeatMv(
     + sampleSingleBeatMv(phase + beatDurationSec, beatDurationSec, leadId, shiftProfile, stageMods, options);
 }
 
+const LBBB_LEFT_LEADS = new Set<LeadId>(['I', 'aVL', 'V5', 'V6', 'V7', 'V8', 'V9']);
+const LBBB_LEFT_AMP: Partial<Record<LeadId, number>> = {
+  I: 1.15,
+  aVL: 0.95,
+  V5: 1.45,
+  V6: 1.3,
+  V7: 1.0,
+  V8: 0.85,
+  V9: 0.72,
+};
+const LBBB_RS_SHAPE: Partial<Record<LeadId, { r: number; s: number }>> = {
+  V1: { r: 0.12, s: -1.45 },
+  V2: { r: 0.18, s: -1.75 },
+  V3: { r: 0.24, s: -1.65 },
+  V4: { r: 0.38, s: -1.1 },
+  V3R: { r: 0.1, s: -1.1 },
+  V4R: { r: 0.08, s: -0.9 },
+  aVR: { r: 0.05, s: -1.05 },
+  II: { r: 0.45, s: -0.55 },
+  III: { r: 0.2, s: -0.95 },
+  aVF: { r: 0.28, s: -0.78 },
+};
+
 /**
  * Расчёт мгновенного потенциала ЭКГ (в мВ) для одного кардиоцикла
  */
@@ -518,7 +658,8 @@ function sampleSingleBeatMv(
   options: EcgRenderOptions
 ): number {
   const base = NORMAL_LEAD_BASE[leadId];
-  const timing = getBeatTiming(beatDurationSec, options.aivr);
+  const qrsPattern: QrsPattern = options.qrsPattern ?? 'normal';
+  const timing = getBeatTiming(beatDurationSec, options.aivr, qrsPattern);
   const { rateScale, qrsOnset, j: tJ, tOnset, tPeak: tT, tEnd } = timing;
   const t = phaseSec;
   if (t < timing.pOnset || t > tEnd) return 0;
@@ -536,36 +677,71 @@ function sampleSingleBeatMv(
 
   const pWave = base.p * pulse(t, timing.pOnset, timing.pEnd);
 
-  // Патологический зубец Q и потеря зубца R (STEMI и поздняя эволюция паттерна де Винтера)
-  const qPot = shiftProfile?.qPotential ?? 0;
-  const rLoss = shiftProfile?.rLoss ?? 0;
-  const isPositiveInf = (shiftProfile?.stMm ?? 0) > 0.35;
-  const canFormQ = isPositiveInf || Boolean(shiftProfile?.deWinterT);
+  // Смещение сегмента PR (характерно для острого перикардита) строго до qrsOnset
+  const prShiftMv = (shiftProfile?.prShiftMm ?? 0) * 0.1 * stageMods.stFactor;
+  const prComponent = prShiftMv !== 0
+    ? prShiftMv
+      * smoothstep(timing.pEnd - 0.008, timing.pEnd + 0.006, t)
+      * (1 - smoothstep(qrsOnset - 0.004, qrsOnset + 0.002, t))
+    : 0;
 
-  let qAmp = base.q;
-  let rAmp = base.r;
-  let sAmp = base.s;
-
-  if (canFormQ && qPot > 0) {
-    // При глубокой эволюции/рубце зубец Q углубляется пропорционально базовой амплитуде комплекса
-    const scaleRef = Math.max(0.65, Math.abs(base.r) + Math.abs(base.s) * 0.4);
-    qAmp = base.q - qPot * stageMods.qFactor * scaleRef * 0.58;
-    rAmp = base.r * (1 - rLoss * stageMods.rLossFactor * 0.88);
-    // При глубоком QS уменьшаем амплитуду R ещё сильнее и сглаживаем S
-    if (rAmp < 0.12 && base.r > 0) {
-      sAmp = base.s * (1 - 0.5 * stageMods.qFactor);
+  let qrsComplex = 0;
+  if (qrsPattern === 'lbbb') {
+    if (LBBB_LEFT_LEADS.has(leadId)) {
+      const amp = LBBB_LEFT_AMP[leadId] ?? 1.1;
+      qrsComplex = amp * (
+        0.86 * pulse(t, qrsOnset, qrsOnset + qrsDuration * 0.64)
+        + 0.94 * pulse(t, qrsOnset + qrsDuration * 0.36, tJ)
+      );
+    } else {
+      const shape = LBBB_RS_SHAPE[leadId] ?? { r: 0.25, s: -0.9 };
+      qrsComplex = shape.r * pulse(t, qrsOnset, qrsOnset + qrsDuration * 0.24)
+        + shape.s * (
+          0.85 * pulse(t, qrsOnset + qrsDuration * 0.16, qrsOnset + qrsDuration * 0.72)
+          + 0.72 * pulse(t, qrsOnset + qrsDuration * 0.44, tJ)
+        );
     }
+  } else {
+    // Патологический зубец Q и потеря зубца R (STEMI и поздняя эволюция паттерна де Винтера)
+    const qPot = shiftProfile?.qPotential ?? 0;
+    const rLoss = shiftProfile?.rLoss ?? 0;
+    const isPositiveInf = (shiftProfile?.stMm ?? 0) > 0.35;
+    const canFormQ = qPot > 0 && (isPositiveInf || Boolean(shiftProfile?.deWinterT));
+
+    let qAmp = base.q;
+    let rAmp = base.r;
+    let sAmp = base.s;
+
+    if (canFormQ) {
+      // При глубокой эволюции/рубце зубец Q углубляется пропорционально базовой амплитуде комплекса
+      const scaleRef = Math.max(0.65, Math.abs(base.r) + Math.abs(base.s) * 0.4);
+      qAmp = base.q - qPot * stageMods.qFactor * scaleRef * 0.58;
+      rAmp = base.r * (1 - rLoss * stageMods.rLossFactor * 0.88);
+      // При глубоком QS уменьшаем амплитуду R ещё сильнее и сглаживаем S
+      if (rAmp < 0.12 && base.r > 0) {
+        sAmp = base.s * (1 - 0.5 * stageMods.qFactor);
+      }
+    } else if (rLoss > 0) {
+      // Лёгкая преходящая потеря R без образования Q (например, при Такоцубо)
+      rAmp = base.r * (1 - rLoss * stageMods.rLossFactor * 0.35);
+    }
+
+    // Зеркальный высокий зубец R в V1-V2 при заднем ИМ
+    if (shiftProfile?.tallRPosterior) {
+      rAmp += 0.72 * Math.max(0.25, stageMods.qFactor + stageMods.stFactor * 0.5);
+      sAmp *= 0.45;
+    }
+
+    const qWave = qAmp * pulse(t, qrsOnset, qrsOnset + qrsDuration * (0.32 + 0.13 * (canFormQ ? stageMods.qFactor : 0)));
+    const rWave = rAmp * pulse(t, qrsOnset + qrsDuration * 0.20, qrsOnset + qrsDuration * 0.70);
+    const sWave = sAmp * pulse(t, qrsOnset + qrsDuration * 0.50, tJ);
+    qrsComplex = qWave + rWave + sWave;
   }
 
-  // Зеркальный высокий зубец R в V1-V2 при заднем ИМ
-  if (shiftProfile?.tallRPosterior) {
-    rAmp += 0.72 * Math.max(0.25, stageMods.qFactor + stageMods.stFactor * 0.5);
-    sAmp *= 0.45;
-  }
-
-  const qWave = qAmp * pulse(t, qrsOnset, qrsOnset + qrsDuration * (0.32 + 0.13 * (canFormQ ? stageMods.qFactor : 0)));
-  const rWave = rAmp * pulse(t, qrsOnset + qrsDuration * 0.20, qrsOnset + qrsDuration * 0.70);
-  const sWave = sAmp * pulse(t, qrsOnset + qrsDuration * 0.50, tJ);
+  // Характерная J-зазубрина («крючок» fish-hook) строго до точки J (в J равна 0)
+  const jNotchComp = shiftProfile?.jNotch
+    ? shiftProfile.jNotch * pulse(t, tJ - 0.015, tJ)
+    : 0;
 
   // Все QRS-компоненты равны нулю в J; T начинается позже. В J остаётся ровно stMv.
   const rawStMm = shiftProfile?.stMm ?? 0;
@@ -588,13 +764,23 @@ function sampleSingleBeatMv(
   }
   const stComponent = stLevel * stStart * stEnd;
 
-  // Зубец T: STEMI-эволюция, паттерн де Винтера, двухфазный Велленс A, первичная инверсия T и ИМбпST
+  // Зубец T: БЛНПГ, Такоцубо, STEMI-эволюция, де Винтер, Велленс, первичная инверсия и ИМбпST
+  const isPositiveInf = rawStMm > 0.35;
   let tAmp = base.t;
   let tSigmaLeft = 0.042 * rateScale;
   let tSigmaRight = 0.032 * rateScale;
   let extraTWave = 0;
 
-  if (shiftProfile?.deWinterT) {
+  if (shiftProfile?.tDiscordant !== undefined) {
+    tAmp = shiftProfile.tDiscordant;
+    tSigmaLeft = 0.044 * rateScale;
+    tSigmaRight = 0.036 * rateScale;
+    if (isPositiveInf && !shiftProfile.fixedSt) {
+      const hyperBoost = (shiftProfile.hyperacuteT ?? 0.35) * stageMods.hyperacuteTFactor * 0.42;
+      const concordantBoost = Math.min(0.45, rawStMm * 0.12) * stageMods.stFactor;
+      tAmp += hyperBoost + concordantBoost;
+    }
+  } else if (shiftProfile?.deWinterT) {
     const dwStrength = shiftProfile.deWinterT * stageMods.deWinterFactor;
     tAmp = base.t + dwStrength * 0.62;
     tSigmaLeft = lerp(0.036 * rateScale, 0.03 * rateScale, stageMods.deWinterFactor);
@@ -624,6 +810,13 @@ function sampleSingleBeatMv(
     tAmp = lerp(base.t, -shiftProfile.primaryTInversion, pFactor);
     tSigmaLeft = lerp(tSigmaLeft, 0.034 * rateScale, pFactor);
     tSigmaRight = lerp(tSigmaRight, 0.034 * rateScale, pFactor);
+  } else if (shiftProfile?.giantTInversion) {
+    const invStrength = stageMods.tInversionFactor;
+    if (invStrength > 0.05) {
+      tAmp = lerp(base.t, -shiftProfile.giantTInversion, invStrength);
+      tSigmaLeft = lerp(tSigmaLeft, 0.036 * rateScale, invStrength);
+      tSigmaRight = lerp(tSigmaRight, 0.036 * rateScale, invStrength);
+    }
   } else if (isPositiveInf) {
     const hyperBoost = (shiftProfile?.hyperacuteT ?? 0.4) * stageMods.hyperacuteTFactor * 0.48;
     const inversionStrength = stageMods.tInversionFactor;
@@ -632,10 +825,16 @@ function sampleSingleBeatMv(
       tSigmaLeft *= 1 + 0.25 * stageMods.hyperacuteTFactor;
       tSigmaRight *= 1 + 0.32 * stageMods.hyperacuteTFactor;
     }
-    if (inversionStrength > 0.02) {
+    if (inversionStrength > 0.02 && (shiftProfile?.qPotential ?? 0) > 0) {
       const targetNegT = -Math.max(0.28, Math.min(0.65, Math.abs(rawStMm) * 0.14));
       tAmp = lerp(tAmp, targetNegT, inversionStrength);
       // Коронарный T более симметричный
+      tSigmaLeft = lerp(tSigmaLeft, 0.036 * rateScale, inversionStrength);
+      tSigmaRight = lerp(tSigmaRight, 0.036 * rateScale, inversionStrength);
+    } else if (inversionStrength > 0.02 && shiftProfile?.prShiftMm) {
+      // Стадия III перикардита: постепенная неглубокая инверсия T без Q
+      const targetPericardialT = -Math.max(0.16, Math.min(0.32, Math.abs(rawStMm) * 0.14));
+      tAmp = lerp(tAmp, targetPericardialT, inversionStrength * 0.85);
       tSigmaLeft = lerp(tSigmaLeft, 0.036 * rateScale, inversionStrength);
       tSigmaRight = lerp(tSigmaRight, 0.036 * rateScale, inversionStrength);
     }
@@ -654,7 +853,7 @@ function sampleSingleBeatMv(
   const tSigma = t < tT ? tSigmaLeft : tSigmaRight;
   const tWave = (tAmp * gaussian(t, tT, tSigma) + extraTWave) * tWindow;
 
-  return pWave + qWave + rWave + sWave + stComponent + tWave;
+  return pWave + prComponent + qrsComplex + jNotchComp + stComponent + tWave;
 }
 
 /**
@@ -707,10 +906,14 @@ export interface EcgMeasurements {
   qtcMs: number;
 }
 
-export function getEcgMeasurements(heartRate: number, aivr: boolean): EcgMeasurements {
+export function getEcgMeasurements(
+  heartRate: number,
+  aivr: boolean,
+  qrsPattern: QrsPattern = 'normal'
+): EcgMeasurements {
   const hr = getEffectiveHeartRate(heartRate, aivr);
   const rrSec = 60 / hr;
-  const timing = getBeatTiming(rrSec, aivr);
+  const timing = getBeatTiming(rrSec, aivr, qrsPattern);
   const qt = timing.tEnd - timing.qrsOnset;
   return {
     hr,
@@ -747,8 +950,14 @@ export function getLeadBadge(
   if (profile.biphasicT && stageMods.biphasicTFactor > 0.35) {
     return { text: 'T +/−', tone: 'inv' };
   }
+  if (profile.fixedSt) {
+    return { text: '', tone: 'none' };
+  }
   // В отведении aVR отрицательный зубец T физиологичен, поэтому вторичные бейджи T↑/T↓ не выводятся.
   if (leadId !== 'aVR') {
+    if (profile.giantTInversion && stageMods.tInversionFactor > 0.45) {
+      return { text: 'T↓ гиг.', tone: 'inv' };
+    }
     if (
       (profile.primaryTInversion && stageMods.primaryTFactor > 0.35) ||
       (profile.biphasicT && stageMods.tInversionFactor > 0.45) ||
@@ -757,14 +966,20 @@ export function getLeadBadge(
     ) {
       return { text: 'T↓ кор.', tone: 'inv' };
     }
-    if (profile.stMm > 0.5 && stageMods.hyperacuteTFactor > 0.55) {
+    if (
+      profile.stMm > 0.5 &&
+      !profile.prShiftMm &&
+      !profile.giantTInversion &&
+      profile.tDiscordant === undefined &&
+      stageMods.hyperacuteTFactor > 0.55
+    ) {
       return { text: 'T↑ остр.', tone: 'hyper' };
     }
-    if (profile.stMm > 0.5 && stageMods.tInversionFactor > 0.45) {
+    if (profile.stMm > 0.5 && ((profile.qPotential ?? 0) > 0 || profile.prShiftMm) && stageMods.tInversionFactor > 0.45) {
       return { text: 'T↓ кор.', tone: 'inv' };
     }
   }
-  if (profile.stMm > 0.5 && stageMods.qFactor > 0.6) {
+  if (profile.stMm > 0.5 && (profile.qPotential ?? 0) > 0 && stageMods.qFactor > 0.6) {
     return { text: 'Q / QS', tone: 'inv' };
   }
   return { text: '', tone: 'none' };

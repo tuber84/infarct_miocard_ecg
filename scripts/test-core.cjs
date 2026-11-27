@@ -55,7 +55,9 @@ test('Все профили доступны как версионированн
     assert.equal(scenario.review.status,'partially-reviewed');
     assert.equal('patient' in scenario,false);
     assert.equal('landmark' in core.CORONARY_CASES[id],false);
-    if (id !== 'normal') assert.ok(HEART_LANDMARKS[id]);
+    const hasCoronaryLesion = core.CORONARY_CASES[id].lesionType !== 'none';
+    if (hasCoronaryLesion) assert.ok(HEART_LANDMARKS[id], `${id}: отсутствует 3D-маркер`);
+    else assert.equal(HEART_LANDMARKS[id], undefined, `${id}: мимик без окклюзии не должен иметь 3D-маркер`);
     const replacement = HEART_LANDMARKS[id]?.replacesBaseMarker;
     if(replacement) assert.ok(HEART_LANDMARKS[replacement]);
   }

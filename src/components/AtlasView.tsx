@@ -53,6 +53,14 @@ const NSTEMI_CASES: CaseId[] = [
   'lmca',
 ];
 
+const MIMIC_CASES: CaseId[] = [
+  'lbbb_sgarbossa',
+  'lbbb_benign',
+  'pericarditis',
+  'early_repol',
+  'takotsubo',
+];
+
 const CHIP_LABELS: Partial<Record<CaseId, string>> = {
   lad_prox: 'ПМЖВ прокс.',
   lad_mid: 'ПМЖВ сред.',
@@ -70,14 +78,25 @@ const CHIP_LABELS: Partial<Record<CaseId, string>> = {
   wellens_b: 'Велленс B',
   de_winter: 'де Винтер',
   lmca: 'Ствол ЛКА',
+  lbbb_sgarbossa: 'БЛНПГ + ОИМ (Смит)',
+  lbbb_benign: 'БЛНПГ (без ОИМ)',
+  pericarditis: 'Перикардит',
+  early_repol: 'СРРЖ (J-notch)',
+  takotsubo: 'Такоцубо',
   normal: 'Норма',
 };
+
+type AtlasGroupTab = 'stemi' | 'nstemi' | 'mimic';
 
 export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
   const initialCase = CORONARY_CASES[initialCaseId];
   const [activeCaseId, setActiveCaseId] = useState<CaseId>(initialCaseId);
-  const [preferredGroup, setPreferredGroup] = useState<'stemi' | 'nstemi'>(
-    initialCase.category === 'nstemi' ? 'nstemi' : 'stemi'
+  const [preferredGroup, setPreferredGroup] = useState<AtlasGroupTab>(
+    MIMIC_CASES.includes(initialCaseId)
+      ? 'mimic'
+      : initialCase.category === 'nstemi'
+        ? 'nstemi'
+        : 'stemi'
   );
   const [dominance, setDominance] = useState<Dominance>('right');
   const [timeline, setTimeline] = useState<number>(0.35);
@@ -132,11 +151,13 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
     setManualStates({});
     setActiveCaseId(id);
     const nextCase = CORONARY_CASES[id];
-    if (nextCase.category === 'stemi' || nextCase.category === 'nstemi') {
+    if (MIMIC_CASES.includes(id)) {
+      setPreferredGroup('mimic');
+    } else if (nextCase.category === 'stemi' || nextCase.category === 'nstemi') {
       setPreferredGroup(nextCase.category);
     }
     setHeartRate(nextCase.defaultHeartRate);
-    if (!nextCase.isPathological) {
+    if (!nextCase.isPathological || nextCase.lesionType === 'none') {
       setReperfused(false);
       setAivr(false);
     }
@@ -190,14 +211,17 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
   const handleToggleArtifacts = useCallback(() => setArtifacts((v) => !v), []);
   const handleToggleExtraRow = useCallback(() => setShowExtraRow((v) => !v), []);
 
-  const ecgOptions = useMemo(() => ({ artifacts, aivr }), [artifacts, aivr]);
+  const ecgOptions = useMemo(
+    () => ({ artifacts, aivr, qrsPattern: resolvedCase.caseData.qrsPattern }),
+    [artifacts, aivr, resolvedCase.caseData.qrsPattern]
+  );
 
   // Отведение по умолчанию для монитора реального времени
   const defaultMonitorLead: LeadId = useMemo(() => {
     if (effectiveCaseId === 'rca_prox' || effectiveCaseId === 'rca_dist' || effectiveCaseId === 'pda') return 'III';
-    if (effectiveCaseId === 'nstemi_inf') return 'II';
+    if (effectiveCaseId === 'nstemi_inf' || effectiveCaseId === 'pericarditis') return 'II';
     if (effectiveCaseId === 'lcx' || effectiveCaseId === 'nstemi_antlat') return 'V5';
-    if (effectiveCaseId === 'nstemi_tinv') return 'V4';
+    if (effectiveCaseId === 'nstemi_tinv' || effectiveCaseId === 'early_repol' || effectiveCaseId === 'takotsubo') return 'V4';
     if (
       effectiveCaseId === 'wellens_a' ||
       effectiveCaseId === 'wellens_b' ||
@@ -212,16 +236,24 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
   }, [effectiveCaseId]);
 
   const isPathological = resolvedCase.caseData.isPathological;
-  const activeTabGroup: 'stemi' | 'nstemi' =
-    resolvedCase.caseData.category === 'nstemi'
+  const activeTabGroup: AtlasGroupTab = MIMIC_CASES.includes(effectiveCaseId)
+    ? 'mimic'
+    : resolvedCase.caseData.category === 'nstemi'
       ? 'nstemi'
       : resolvedCase.caseData.category === 'stemi'
         ? 'stemi'
         : preferredGroup;
-  const groupCases = activeTabGroup === 'nstemi' ? NSTEMI_CASES : STEMI_CASES;
+  const groupCases =
+    activeTabGroup === 'mimic'
+      ? MIMIC_CASES
+      : activeTabGroup === 'nstemi'
+        ? NSTEMI_CASES
+        : STEMI_CASES;
 
+  const isMimic = resolvedCase.caseData.category === 'mimic';
   const isUrgentStemiLike =
     resolvedCase.caseData.category === 'stemi' || effectiveCaseId === 'de_winter';
+  const isStaticNormalOrBenign = !isPathological && !isMimic;
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -270,6 +302,13 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
                   </option>
                 ))}
               </optgroup>
+              <optgroup label="Блокады и мимики STEMI">
+                {MIMIC_CASES.map((id) => (
+                  <option key={id} value={id}>
+                    {getAtlasScenario(id).title}
+                  </option>
+                ))}
+              </optgroup>
               <optgroup label="Без острой патологии">
                 <option value="normal">{CORONARY_CASES.normal.shortTitle}</option>
               </optgroup>
@@ -313,12 +352,12 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
         {/* Компактная панель выбора типа ОКС (ИМпST / ИМбпST) и сценариев */}
         <section className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
+            <div className="flex flex-wrap rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
               <button
                 type="button"
                 onClick={() => {
                   setPreferredGroup('stemi');
-                  if (resolvedCase.caseData.category !== 'stemi' || manualMode) {
+                  if (activeTabGroup !== 'stemi' || effectiveCaseId === 'normal' || manualMode) {
                     handleSelectCase(STEMI_CASES[0]);
                   }
                 }}
@@ -334,7 +373,7 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
                 type="button"
                 onClick={() => {
                   setPreferredGroup('nstemi');
-                  if (resolvedCase.caseData.category !== 'nstemi' || manualMode) {
+                  if (activeTabGroup !== 'nstemi' || effectiveCaseId === 'normal' || manualMode) {
                     handleSelectCase(NSTEMI_CASES[0]);
                   }
                 }}
@@ -345,6 +384,22 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
                 }`}
               >
                 ОКСбпST / паттерны
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreferredGroup('mimic');
+                  if (activeTabGroup !== 'mimic' || effectiveCaseId === 'normal' || manualMode) {
+                    handleSelectCase(MIMIC_CASES[0]);
+                  }
+                }}
+                className={`rounded-md px-3 py-1 font-bold transition ${
+                  activeTabGroup === 'mimic' && effectiveCaseId !== 'normal'
+                    ? 'bg-indigo-700 text-white shadow-sm'
+                    : 'text-slate-700 hover:text-slate-900'
+                }`}
+              >
+                Блокады / мимики
               </button>
             </div>
 
@@ -358,9 +413,13 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
                     onClick={() => handleSelectCase(id)}
                     className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition ${
                       isSel
-                        ? activeTabGroup === 'nstemi'
-                          ? 'bg-amber-600 text-white shadow-sm'
-                          : 'bg-red-700 text-white shadow-sm'
+                        ? activeTabGroup === 'mimic'
+                          ? id === 'lbbb_sgarbossa'
+                            ? 'bg-red-700 text-white shadow-sm'
+                            : 'bg-indigo-700 text-white shadow-sm'
+                          : activeTabGroup === 'nstemi'
+                            ? 'bg-amber-600 text-white shadow-sm'
+                            : 'bg-red-700 text-white shadow-sm'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
@@ -391,6 +450,7 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
             <LeadCardsPanel
               leadProfiles={effectiveLeadProfiles}
               stageMods={stageMods}
+              qrsPattern={resolvedCase.caseData.qrsPattern}
               manualMode={manualMode}
               manualStates={manualStates}
               recommendedExtraLeads={recommendedExtraLeads}
@@ -418,32 +478,38 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
               className={`rounded-xl border p-3.5 shadow-sm ${
                 manualMode
                   ? 'border-amber-300 bg-amber-50/60'
-                  : !isPathological
+                  : isStaticNormalOrBenign
                     ? 'border-emerald-200 bg-emerald-50/40'
-                    : isUrgentStemiLike
-                      ? 'border-red-200 bg-white'
-                      : 'border-amber-200 bg-white'
+                    : isMimic
+                      ? 'border-indigo-200 bg-white'
+                      : isUrgentStemiLike
+                        ? 'border-red-200 bg-white'
+                        : 'border-amber-200 bg-white'
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-1.5 pb-1.5">
                 <span
                   className={`rounded-md px-2 py-0.5 text-[10.5px] font-bold ${
-                    !isPathological
+                    isStaticNormalOrBenign
                       ? 'bg-emerald-100 text-emerald-800'
-                      : isUrgentStemiLike
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-amber-100 text-amber-900'
+                      : isMimic
+                        ? 'bg-indigo-100 text-indigo-800'
+                        : isUrgentStemiLike
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-amber-100 text-amber-900'
                   }`}
                 >
                   {manualMode ? (hasManualHypothesis ? 'Учебная гипотеза' : 'Недостаточно данных') : resolvedCase.caseData.syndromeBadge}
                 </span>
                 <span
                   className={`rounded-md border px-2 py-0.5 text-[10.5px] font-semibold ${
-                    !isPathological
+                    isStaticNormalOrBenign
                       ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : isUrgentStemiLike
-                        ? 'border-red-200 bg-red-50 text-red-700'
-                        : 'border-amber-200 bg-amber-50 text-amber-800'
+                      : isMimic
+                        ? 'border-indigo-200 bg-indigo-50 text-indigo-800'
+                        : isUrgentStemiLike
+                          ? 'border-red-200 bg-red-50 text-red-700'
+                          : 'border-amber-200 bg-amber-50 text-amber-800'
                   }`}
                 >
                   {manualMode ? 'Срочность — по клинике и риску' : resolvedCase.caseData.urgencyLabel}
@@ -456,11 +522,13 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
                     className={`inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider ${
                       manualMode
                         ? 'text-amber-800'
-                        : !isPathological
+                        : isStaticNormalOrBenign
                           ? 'text-emerald-700'
-                          : isUrgentStemiLike
-                            ? 'text-red-700'
-                            : 'text-amber-800'
+                          : isMimic
+                            ? 'text-indigo-700'
+                            : isUrgentStemiLike
+                              ? 'text-red-700'
+                              : 'text-amber-800'
                     }`}
                   >
                     {manualMode ? (
@@ -468,6 +536,8 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
                         <Sparkles className="h-3 w-3" />
                         Обратный локализатор по ЭКГ
                       </>
+                    ) : isMimic ? (
+                      'Дифференциальный диагноз · русло'
                     ) : (
                       'Инфаркт-связанная артерия (ИСА)'
                     )}
@@ -477,11 +547,13 @@ export function AtlasView({ initialCaseId }: { initialCaseId: CaseId }) {
                   </h2>
                   <p
                     className={`text-xs font-semibold ${
-                      !isPathological
+                      isStaticNormalOrBenign
                         ? 'text-emerald-700'
-                        : isUrgentStemiLike
-                          ? 'text-red-700'
-                          : 'text-amber-800'
+                        : isMimic
+                          ? 'text-indigo-700'
+                          : isUrgentStemiLike
+                            ? 'text-red-700'
+                            : 'text-amber-800'
                     }`}
                   >
                     {manualMode ? 'Проверьте амплитуды, форму ST/T и динамику.' : resolvedCase.segmentLabel}

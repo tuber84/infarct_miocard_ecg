@@ -103,6 +103,12 @@ function buildHeartLandmarks(geom: SegmentGeometryMap): Partial<Record<CaseId, O
       vesselRegion: 'de_winter',
       replacesBaseMarker: 'lad_prox',
     },
+    lbbb_sgarbossa: {
+      mesh: 'LAD_prox',
+      localPos: [...geom.LAD_prox.marker],
+      vesselRegion: 'lbbb_sgarbossa',
+      replacesBaseMarker: 'lad_prox',
+    },
   };
 }
 

@@ -95,9 +95,13 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
   const injuredSet = new Set(ahaSegments);
   const reciprocalSet = new Set(reciprocalSegments);
   const isSubendocardial = lesionType === 'subocclusion' || lesionType === 'stenosis';
+  const isTakotsubo = activeCaseId === 'takotsubo';
 
   const getSegmentFill = (segId: number) => {
     if (injuredSet.has(segId)) {
+      if (isTakotsubo) {
+        return timeline >= 0.85 ? '#d8b4fe' : '#9333ea';
+      }
       if (activeCaseId === 'lmca') {
         return reperfused && timeline >= 0.35 ? '#fcd34d' : '#f97316';
       }
@@ -121,6 +125,9 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
 
   const getSegmentTextFill = (segId: number) => {
     if (injuredSet.has(segId)) {
+      if (isTakotsubo) {
+        return timeline >= 0.85 ? '#581c87' : '#ffffff';
+      }
       if (isSubendocardial) {
         if (reperfused && timeline >= 0.35) return '#78350f';
         return '#ffffff';
@@ -275,15 +282,21 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
             <span className="flex items-center gap-1">
               <span
                 className={`inline-block h-2.5 w-2.5 rounded-sm ${
-                  isSubendocardial ? 'bg-amber-500' : 'bg-red-600'
+                  isTakotsubo ? 'bg-purple-600' : isSubendocardial ? 'bg-amber-500' : 'bg-red-600'
                 }`}
               />
-              {isSubendocardial ? 'Субэндокард. ишемия' : 'Зона ишемии'}
+              {isTakotsubo
+                ? 'Апикальное баллонирование (Такоцубо, не по 1 артерии)'
+                : isSubendocardial
+                  ? 'Субэндокард. ишемия'
+                  : 'Зона ишемии'}
             </span>
-            <span className="flex items-center gap-1">
-              <span className="inline-block h-2.5 w-2.5 rounded-sm border border-blue-600 bg-blue-100" />
-              Реципрокн.
-            </span>
+            {!isTakotsubo && (
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm border border-blue-600 bg-blue-100" />
+                Реципрокн.
+              </span>
+            )}
           </div>
         )}
       </div>

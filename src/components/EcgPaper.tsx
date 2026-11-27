@@ -421,7 +421,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
 
       if (caliperEnabled) {
         const rr = 60 / getEffectiveHeartRate(heartRate, options.aivr);
-        const timing = getBeatTiming(rr, options.aivr);
+        const timing = getBeatTiming(rr, options.aivr, options.qrsPattern);
         const cycleStart = Math.ceil(timeOffsetSec / rr) * rr;
         const markers: [string, number][] = [
           ...(!options.aivr ? [['P', timing.pOnset] as [string, number]] : []),
@@ -560,7 +560,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
     return { dxMm: dxMm.toFixed(1), dyMm: dyMm.toFixed(1), dtMs, estBpm, dMv };
   })();
 
-  const measurements = getEcgMeasurements(heartRate, options.aivr);
+  const measurements = getEcgMeasurements(heartRate, options.aivr, options.qrsPattern);
 
   return (
     <div className="ecg-paper min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm">

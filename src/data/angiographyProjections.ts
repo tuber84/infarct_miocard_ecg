@@ -362,6 +362,31 @@ export const CASE_OPTIMAL_PROJECTION: Record<CaseId, CaseOptimalProjection> = {
     system: 'LCA',
     reason: 'Экстренная оценка проксимальной ПМЖВ и ствола ЛКА при паттерне де Винтера',
   },
+  lbbb_sgarbossa: {
+    projectionId: 'lao_caudal',
+    system: 'LCA',
+    reason: 'Экстренная оценка проксимальной ПМЖВ и ствола ЛКА при ОИМ на фоне БЛНПГ (критерии Сгарбосса/Смита)',
+  },
+  lbbb_benign: {
+    projectionId: 'ap',
+    system: 'BOTH',
+    reason: 'Интактное коронарное русло при неосложнённой БЛНПГ (отрицательные критерии Сгарбосса/Смита)',
+  },
+  pericarditis: {
+    projectionId: 'ap',
+    system: 'BOTH',
+    reason: 'Проходимые коронарные артерии (TIMI 3) при остром перикардите — исключение ОКС при сомнениях',
+  },
+  early_repol: {
+    projectionId: 'ap',
+    system: 'BOTH',
+    reason: 'Нормальное коронарное русло (TIMI 3) — ранняя реполяризация желудочков не требует КАГ',
+  },
+  takotsubo: {
+    projectionId: 'ap',
+    system: 'BOTH',
+    reason: 'Интактные коронарные артерии (TIMI 3) на экстренной КАГ при синдроме Такоцубо (диагноз исключения)',
+  },
 };
 
 export function getOptimalProjectionForCase(

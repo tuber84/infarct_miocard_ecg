@@ -53,10 +53,19 @@ export function localizeFromManualLeads(
   const steSet = new Set(activeEntries.filter(([, s]) => s === 'ste').map(([l]) => l));
   const stdSet = new Set(activeEntries.filter(([, s]) => s === 'std').map(([l]) => l));
   const tinvSet = new Set(activeEntries.filter(([, s]) => s === 'tinv').map(([l]) => l));
-  // Тип A и де Винтер требуют признаков, которых нет в четырёхпозиционном вводе.
-  const candidateIds = CASE_ORDER.filter((id) =>
-    id !== 'normal' && id !== 'wellens_a' && id !== 'de_winter' &&
-    (id !== 'wellens_b' || (tinvSet.has('V2') && tinvSet.has('V3')))
+  // Тип A, де Винтер, блокады и некоронарные мимики требуют признаков, которых нет в четырёхпозиционном вводе.
+  const excludedIds = new Set<CaseId>([
+    'normal',
+    'wellens_a',
+    'de_winter',
+    'lbbb_sgarbossa',
+    'lbbb_benign',
+    'pericarditis',
+    'early_repol',
+    'takotsubo',
+  ]);
+  const candidateIds = CASE_ORDER.filter(
+    (id) => !excludedIds.has(id) && (id !== 'wellens_b' || (tinvSet.has('V2') && tinvSet.has('V3')))
   );
   const scores: { id: CaseId; score: number }[] = [];
 
@@ -283,6 +292,19 @@ export function localizeFromManualLeads(
   }
   if (stdSet.has('aVL') && steSet.size === 0) {
     reasoning.push('Депрессия ST в aVL (и I) без отмеченных подъёмов может быть как боковой субэндокардиальной ишемией, так и ранним реципрокным признаком нижнего ИМпST — оцените II, III, aVF в динамике.');
+  }
+  const hasDiffuseSte =
+    (steSet.has('V3') || steSet.has('V4')) &&
+    (steSet.has('II') || steSet.has('III') || steSet.has('aVF')) &&
+    (steSet.has('V5') || steSet.has('V6') || steSet.has('I')) &&
+    !stdSet.has('aVL');
+  if (hasDiffuseSte) {
+    reasoning.push('При диффузном подъёме ST без реципрокной депрессии в aVL оцените вогнутость ST, депрессию сегмента PR (острый перикардит) и синдром Такоцубо, не откладывая исключение ОКС / wrap-around ПМЖВ.');
+  } else if (
+    (steSet.has('V2') || steSet.has('V3') || steSet.has('V4')) &&
+    stdSet.size === 0
+  ) {
+    reasoning.push('При переднем подъёме ST без реципрокной депрессии проверьте ширину QRS (при БЛНПГ — критерии Сгарбосса / Смита) и наличие J-зазубрины (СРРЖ); диагноз не ставится без клиники и динамики ЭКГ.');
   }
 
   const recExtra = new Set<ExtraLeadId>(hasHypothesis ? primaryCase.recommendedExtraLeads : []);

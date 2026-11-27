@@ -11,7 +11,7 @@ require.extensions['.ts'] = (module, filename) => {
 };
 const { HEART_LANDMARKS, getHeartLandmarks } = require('../src/presentation/heartLandmarks.ts');
 const { ARTERY_SEGMENTS, affectedArterySegments, segmentContrastDistance } = require('../src/presentation/segmentedHeart.ts');
-const { CASE_ORDER } = require('../src/core/content/coronaryCases.ts');
+const { CASE_ORDER, CORONARY_CASES } = require('../src/core/content/coronaryCases.ts');
 
 function getVertexKeySet(mesh) {
   const p = mesh.geometry.attributes.position;
@@ -105,7 +105,7 @@ test('Экспорт правого типа загружается, сохра�
     assert.equal(m.geometry.attributes.normal.count, m.geometry.attributes.position.count);
     assert.equal(m.material.vertexColors, true);
   }
-  for (const id of CASE_ORDER.filter(id => id !== 'normal')) {
+  for (const id of CASE_ORDER.filter(id => CORONARY_CASES[id].lesionType !== 'none')) {
     const lm = HEART_LANDMARKS[id]; assert.ok(lm, id);
     const p = meshes[lm.mesh].geometry.attributes.position;
     let distance = Infinity;
@@ -138,7 +138,7 @@ test('Экспорт левого типа загружается, сохран�
     assert.equal(m.material.vertexColors, true);
   }
   const leftLandmarks = getHeartLandmarks('left');
-  for (const id of CASE_ORDER.filter(id => id !== 'normal')) {
+  for (const id of CASE_ORDER.filter(id => CORONARY_CASES[id].lesionType !== 'none')) {
     const lm = leftLandmarks[id]; assert.ok(lm, id);
     const p = meshes[lm.mesh].geometry.attributes.position;
     let distance = Infinity;
@@ -165,6 +165,12 @@ test('Экспорт левого типа загружается, сохран�
 
 test('Поражения не затрагивают посторонний бассейн, доминирование переключает нижнее русло, а маркеры ЗМЖВ и ЗБВ разнесены', () => {
   assert.deepEqual(affectedArterySegments('normal','right'), []);
+  for (const mimicId of ['lbbb_benign', 'pericarditis', 'early_repol', 'takotsubo']) {
+    assert.deepEqual(affectedArterySegments(mimicId, 'right'), [], `${mimicId} не должен поражать артерии (right)`);
+    assert.deepEqual(affectedArterySegments(mimicId, 'left'), [], `${mimicId} не должен поражать артерии (left)`);
+    assert.equal(HEART_LANDMARKS[mimicId], undefined, `${mimicId} не должен иметь 3D-маркер`);
+  }
+  assert.ok(affectedArterySegments('lbbb_sgarbossa', 'right').includes('LAD_prox'));
   assert.ok(!affectedArterySegments('lad_prox','right').includes('LCx'));
   assert.ok(affectedArterySegments('lad_mid','right').includes('LAD_dist'));
   assert.ok(!affectedArterySegments('lad_mid','right').includes('LAD_prox'));

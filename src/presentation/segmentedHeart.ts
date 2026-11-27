@@ -10,7 +10,7 @@ export const isLeftCoronarySegment = (name: string) =>
 export function affectedArterySegments(caseId: CaseId, dominance: Dominance): readonly ArterySegment[] {
   switch (caseId) {
     case 'lmca': return ['LMCA', 'LAD_prox', 'LAD_mid', 'LAD_dist', 'D1', 'D2', 'LCx', 'OM1', ...(dominance === 'left' ? ['PDA', 'PLB'] as const : [])];
-    case 'lad_prox': case 'de_winter': case 'wellens_a': case 'wellens_b':
+    case 'lad_prox': case 'de_winter': case 'wellens_a': case 'wellens_b': case 'lbbb_sgarbossa':
       return ['LAD_prox', 'LAD_mid', 'LAD_dist', 'D1', 'D2'];
     case 'lad_mid': case 'nstemi_antlat': case 'nstemi_tinv': return ['LAD_mid', 'LAD_dist', 'D2'];
     case 'lad_wrap': return ['LAD_dist'];

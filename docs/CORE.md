@@ -10,7 +10,7 @@
 | `src/core/types.ts` | Типы отведений, профилей, стадий, локализации |
 | `src/core/ecg/ecgEngine.ts` | Генерация сигнала, реперы и измерения |
 | `src/core/ecg/localizer.ts` | Сопоставление ручной разметки с примерами |
-| `src/core/content/coronaryCases.ts` | 17 медицинских профилей и коррекция по типу кровоснабжения |
+| `src/core/content/coronaryCases.ts` | 22 медицинских профиля (ИМпST, ИМбпST, блокады и мимики) и коррекция по типу кровоснабжения |
 | `src/core/content/clinicalGuidelines.ts` | Ссылки, критерии и пояснения российских КР |
 | `src/core/scenarios/types.ts` | Контракты примера атласа и клинической задачи |
 | `src/core/scenarios/catalog.ts` | Каталог существующих примеров и реестр источников |

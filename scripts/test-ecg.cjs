@@ -11,7 +11,7 @@ require.extensions['.ts'] = (module, filename) => {
   module._compile(result.outputText, filename);
 };
 
-const { sampleBeatMv, generateLeadSignal, getBeatTiming, getEcgMeasurements, computeStageModifiers, getLeadBadge, DE_WINTER_STAGE_SUMMARIES, STAGE_PRESETS } = require('../src/core/ecg/ecgEngine.ts');
+const { sampleBeatMv, generateLeadSignal, getBeatTiming, getEcgMeasurements, getJShiftMm, computeStageModifiers, getLeadBadge, DE_WINTER_STAGE_SUMMARIES, STAGE_PRESETS } = require('../src/core/ecg/ecgEngine.ts');
 const { CORONARY_CASES, resolveCaseForDominance, STANDARD_LEADS, EXTRA_LEADS } = require('../src/core/content/coronaryCases.ts');
 const options = { aivr: false, artifacts: false };
 const rates = [40, 45, 54, 72, 95, 135, 150];
@@ -19,16 +19,16 @@ const close = (a, b, tolerance, context) => assert.ok(Math.abs(a - b) <= toleran
 
 test('J совпадает с заданным смещением во всех сценариях, стадиях и типах кровоснабжения', () => {
   for (const id of Object.keys(CORONARY_CASES)) for (const dominance of ['right', 'left']) {
-    const { leads } = resolveCaseForDominance(id, dominance);
+    const { caseData, leads } = resolveCaseForDominance(id, dominance);
+    const caseOptions = { ...options, qrsPattern: caseData.qrsPattern };
     for (const hr of rates) for (const reperfused of [false, true]) for (const time of [0, .12, .35, .58, .8, 1]) {
       const stage = computeStageModifiers(time, reperfused);
       const rr = 60 / hr;
-      const { j } = getBeatTiming(rr);
+      const { j } = getBeatTiming(rr, false, caseData.qrsPattern);
       for (const lead of [...STANDARD_LEADS, ...EXTRA_LEADS]) {
         const p = leads[lead];
-        const factor = p?.deWinterT ? stage.deWinterFactor : p?.isSubendocardial ? stage.subendoStFactor : p?.isReciprocal ? stage.reciprocalFactor : stage.stFactor;
-        const expected = (p?.stMm ?? 0) * factor;
-        const actual = sampleBeatMv(j, rr, lead, p, stage, options) * 10;
+        const expected = getJShiftMm(p, stage);
+        const actual = sampleBeatMv(j, rr, lead, p, stage, caseOptions) * 10;
         close(actual, expected, 1e-9, `${id}/${lead}/${hr}/${time}/${reperfused}`);
         const badge = getLeadBadge(p, stage, lead);
         if (/^ST[↑↓]/.test(badge.text)) close(Number(badge.text.split(' ')[1]), actual, .051, 'Бейдж J');
@@ -109,14 +109,16 @@ test('Сохраняются полярности T Велленса A/B и вы
 test('Дискретизация ленты 1000 Гц сохраняет J в пределах 0,05 мм', () => {
   const stage = computeStageModifiers(.35, false);
   for (const hr of rates) for (const id of Object.keys(CORONARY_CASES)) {
-    const p = CORONARY_CASES[id].leads.V3;
+    const c = CORONARY_CASES[id];
+    const p = c.leads.V3;
+    const caseOptions = { ...options, qrsPattern: c.qrsPattern };
     const rr = 60 / hr;
-    const { j } = getBeatTiming(rr);
-    const signal = generateLeadSignal('V3', p, stage, 4, 1000, hr, options, .137);
+    const { j } = getBeatTiming(rr, false, c.qrsPattern);
+    const signal = generateLeadSignal('V3', p, stage, 4, 1000, hr, caseOptions, .137);
     const when = rr + j - .137;
     const x = when * 1000, i = Math.floor(x);
     const interpolated = signal[i] + (signal[i+1] - signal[i]) * (x-i);
-    close(interpolated, sampleBeatMv(j, rr, 'V3', p, stage, options), .005, 'J на ленте');
+    close(interpolated, sampleBeatMv(j, rr, 'V3', p, stage, caseOptions), .005, 'J на ленте');
   }
 });
 
@@ -134,4 +136,65 @@ test('Описания стадий де Винтера и бейдж aVR сог
       assert.notEqual(badge.text, 'T↓ кор.', `${id}/${dominance}/${time}/${reperfused}`);
     }
   }
+});
+
+test('БЛНПГ: ширина QRS 148 мс, критерии Сгарбосса/Смита и норма дискордантности', () => {
+  const stage = computeStageModifiers(.35, false);
+  for (const id of ['lbbb_sgarbossa', 'lbbb_benign']) {
+    const m = getEcgMeasurements(72, false, CORONARY_CASES[id].qrsPattern);
+    assert.equal(m.qrsMs, 148);
+    const rr = 60 / m.hr;
+    const timing = getBeatTiming(rr, false, 'lbbb');
+    // Проверяем реальную ненулевую ширину QRS на чистой кривой БЛНПГ с нулевым J
+    const signal = generateLeadSignal('V5', undefined, stage, rr, 10000, m.hr, { ...options, qrsPattern: 'lbbb' });
+    let activeStart = null;
+    let activeEnd = null;
+    for (let i = Math.floor(timing.qrsOnset * 10000); i <= Math.ceil((timing.j + 0.01) * 10000); i++) {
+      if (Math.abs(signal[i]) > 1e-8) {
+        if (activeStart === null) activeStart = i / 10;
+        activeEnd = i / 10;
+      }
+    }
+    close(activeEnd - activeStart, 148, 1, `${id}: ширина QRS`);
+  }
+
+  // Сгарбосса / Смит: конкордантный ST↑ >= 1.5 мм в V5 и |ST/S| >= 0.25 в V2
+  const stV5Sgarb = getJShiftMm(CORONARY_CASES.lbbb_sgarbossa.leads.V5, stage);
+  assert.ok(stV5Sgarb >= 1.5, `Ожидался конкордантный ST↑ в V5, получено ${stV5Sgarb}`);
+  const stV2Sgarb = getJShiftMm(CORONARY_CASES.lbbb_sgarbossa.leads.V2, stage);
+  assert.ok(stV2Sgarb / 17.5 >= 0.25, `Ожидалось |ST/S| >= 0.25 в V2, получено ${stV2Sgarb / 17.5}`);
+
+  // Неосложнённая БЛНПГ: дискордантная депрессия в V5 (< 0) и пропорциональный ST в V2 (|ST/S| < 0.20)
+  const stV5Benign = getJShiftMm(CORONARY_CASES.lbbb_benign.leads.V5, stage);
+  assert.ok(stV5Benign < 0, `Ожидалась дискордантность в V5, получено ${stV5Benign}`);
+  const stV2Benign = getJShiftMm(CORONARY_CASES.lbbb_benign.leads.V2, stage);
+  assert.ok(stV2Benign / 17.5 < 0.2, `Ожидалось |ST/S| < 0.20 в V2, получено ${stV2Benign / 17.5}`);
+});
+
+test('Острый перикардит (смещение PR без Q) и Такоцубо (без подъёма в V1 и гигантские T↓)', () => {
+  const acute = computeStageModifiers(.35, false);
+  const subacute = computeStageModifiers(.8, false);
+  const chronic = computeStageModifiers(1.0, false);
+  const rr = 60 / 90;
+  const timing = getBeatTiming(rr);
+  const tPrMid = (timing.pEnd + timing.qrsOnset) / 2;
+
+  // Перикардит: депрессия PR в II, подъём PR в aVR, отсутствие патологического Q на стадии рубца
+  const prII = sampleBeatMv(tPrMid, rr, 'II', CORONARY_CASES.pericarditis.leads.II, acute, options) * 10;
+  const prAvr = sampleBeatMv(tPrMid, rr, 'aVR', CORONARY_CASES.pericarditis.leads.aVR, acute, options) * 10;
+  assert.ok(prII < -0.3, `Ожидалась депрессия PR в II, получено ${prII}`);
+  assert.ok(prAvr > 0.3, `Ожидался подъём PR в aVR, получено ${prAvr}`);
+  const qPeric = sampleBeatMv(timing.qrsOnset + 0.014, rr, 'V4', CORONARY_CASES.pericarditis.leads.V4, chronic, options);
+  const qNorm = sampleBeatMv(timing.qrsOnset + 0.014, rr, 'V4', undefined, chronic, options);
+  close(qPeric, qNorm, 1e-6, 'Перикардит не должен формировать зубец Q');
+
+  // Такоцубо: подъём ST в V4, интактный V1, гигантский отрицательный T в подострой фазе без Q
+  assert.ok(getJShiftMm(CORONARY_CASES.takotsubo.leads.V4, acute) >= 2.0);
+  assert.equal(getJShiftMm(CORONARY_CASES.takotsubo.leads.V1, acute), 0);
+  const tTako = Array.from({ length: 101 }, (_, i) =>
+    sampleBeatMv(timing.tOnset + (timing.tEnd - timing.tOnset) * i / 100, rr, 'V4', CORONARY_CASES.takotsubo.leads.V4, subacute, options)
+  );
+  assert.ok(Math.min(...tTako) < -0.6, 'Ожидалась глубокая симметричная инверсия T при Такоцубо');
+  const qTako = sampleBeatMv(timing.qrsOnset + 0.014, rr, 'V4', CORONARY_CASES.takotsubo.leads.V4, chronic, options);
+  assert.ok(qTako >= qNorm - 0.05, 'Такоцубо не должен формировать глубокий некротический Q');
 });

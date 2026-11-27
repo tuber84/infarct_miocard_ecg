@@ -85,3 +85,15 @@ test('Левый тип кровоснабжения разделяет ЗМЖВ
   const pureInferiorLeft = localize({ II: 'ste', III: 'ste', aVF: 'ste', aVL: 'std' }, 'left');
   assert.equal(pureInferiorLeft.primaryCaseId, 'pda');
 });
+
+test('Некоронарные мимики и БЛНПГ исключены из автоподбора, а диффузный ST↑ даёт подсказку о перикардите/Такоцубо', () => {
+  const forbidden = new Set(['pericarditis', 'early_repol', 'takotsubo', 'lbbb_benign', 'lbbb_sgarbossa']);
+  const diffuse = localize({ I: 'ste', II: 'ste', III: 'ste', aVF: 'ste', V3: 'ste', V4: 'ste', V5: 'ste', V6: 'ste' }, 'right');
+  assert.ok(!forbidden.has(diffuse.primaryCaseId));
+  assert.ok(!forbidden.has(diffuse.secondaryCaseId));
+  assert.ok(diffuse.reasoning.some((line) => line.includes('перикардит') && line.includes('Такоцубо')));
+
+  const ant = localize({ V2: 'ste', V3: 'ste', V4: 'ste' }, 'right');
+  assert.ok(!forbidden.has(ant.primaryCaseId));
+  assert.ok(ant.reasoning.some((line) => line.includes('Сгарбосса') || line.includes('СРРЖ')));
+});

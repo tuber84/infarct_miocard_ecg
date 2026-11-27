@@ -60,6 +60,14 @@ app.whenReady().then(async () => {
       await click('ПМЖВ прокс.');
       await click('ОКСбпST / паттерны');
       for (const label of ['ИМбпST нижн.', 'Велленс A', 'Велленс B', 'де Винтер', 'Ствол ЛКА']) await click(label);
+      await click('Блокады / мимики');
+      await click('БЛНПГ + ОИМ (Смит)');
+      check(text().includes('QRS: 148 мс'), 'Нет ширины QRS 148 мс при БЛНПГ');
+      await click('БЛНПГ (без ОИМ)');
+      await click('Перикардит');
+      await click('СРРЖ (J-notch)');
+      await click('Такоцубо');
+      check(text().includes('Апикальное баллонирование'), 'Нет легенды Такоцубо на схеме AHA');
       await click('ИМпST (STEMI)');
       await click('Левый тип'); await click('Правый тип');
       await click('Сравнить с ранней успешной реперфузией');
@@ -111,7 +119,7 @@ app.whenReady().then(async () => {
     })()`);
     if (scrollY <= 0) throw new Error('Не удалось прокрутить к клиническому разбору');
     fs.writeFileSync(path.join(outputDir, 'clinical.png'), (await win.webContents.capturePage()).toPNG());
-    for (const [id, filename] of [['normal', 'ecg-normal'], ['lad_prox', 'ecg-stemi'], ['de_winter', 'ecg-de-winter'], ['wellens_a', 'ecg-wellens-a'], ['wellens_b', 'ecg-wellens-b'], ['nstemi_antlat', 'ecg-depression']]) {
+    for (const [id, filename] of [['normal', 'ecg-normal'], ['lad_prox', 'ecg-stemi'], ['de_winter', 'ecg-de-winter'], ['wellens_a', 'ecg-wellens-a'], ['wellens_b', 'ecg-wellens-b'], ['nstemi_antlat', 'ecg-depression'], ['lbbb_sgarbossa', 'ecg-lbbb-sgarbossa'], ['pericarditis', 'ecg-pericarditis'], ['takotsubo', 'ecg-takotsubo']]) {
       const png = await win.webContents.executeJavaScript(`(async () => {
         const select = document.querySelector('select');
         Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, ${JSON.stringify(id)});

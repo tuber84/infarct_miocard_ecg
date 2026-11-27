@@ -12,12 +12,14 @@ import {
   LeadId,
   LeadShiftProfile,
   ManualLeadState,
+  QrsPattern,
   StageModifiers,
 } from '../core/types';
 
 interface LeadCardsPanelProps {
   leadProfiles: Partial<Record<LeadId, LeadShiftProfile>>;
   stageMods: StageModifiers;
+  qrsPattern?: QrsPattern;
   manualMode: boolean;
   manualStates: Partial<Record<LeadId, ManualLeadState>>;
   recommendedExtraLeads: ExtraLeadId[];
@@ -28,7 +30,8 @@ interface LeadCardsPanelProps {
 function buildMiniLeadPath(
   leadId: LeadId,
   profile: LeadShiftProfile | undefined,
-  stageMods: StageModifiers
+  stageMods: StageModifiers,
+  qrsPattern?: QrsPattern
 ): string {
   const width = 92;
   const height = 28;
@@ -44,6 +47,7 @@ function buildMiniLeadPath(
     const mv = sampleBeatMv(t, beatDur, leadId, profile, stageMods, {
       artifacts: false,
       aivr: false,
+      qrsPattern,
     });
     const x = (u * width).toFixed(1);
     const y = Math.max(2, Math.min(height - 2, baselineY - mv * pxPerMv)).toFixed(1);
@@ -56,6 +60,7 @@ interface LeadCardProps {
   lead: LeadId;
   profile: LeadShiftProfile | undefined;
   stageMods: StageModifiers;
+  qrsPattern?: QrsPattern;
   manualMode: boolean;
   manualState: ManualLeadState;
   isRecommendedExtra: boolean;
@@ -66,6 +71,7 @@ const LeadCard: React.FC<LeadCardProps> = React.memo(({
   lead,
   profile,
   stageMods,
+  qrsPattern,
   manualMode,
   manualState,
   isRecommendedExtra,
@@ -95,8 +101,8 @@ const LeadCard: React.FC<LeadCardProps> = React.memo(({
               : 'border-slate-200 bg-white hover:border-slate-300';
 
   const pathD = useMemo(
-    () => buildMiniLeadPath(lead, profile, stageMods),
-    [lead, profile, stageMods]
+    () => buildMiniLeadPath(lead, profile, stageMods, qrsPattern),
+    [lead, profile, stageMods, qrsPattern]
   );
 
   const strokeColor =
@@ -179,6 +185,7 @@ const LeadCard: React.FC<LeadCardProps> = React.memo(({
 const LeadCardsPanelComponent: React.FC<LeadCardsPanelProps> = ({
   leadProfiles,
   stageMods,
+  qrsPattern,
   manualMode,
   manualStates,
   recommendedExtraLeads,
@@ -200,6 +207,7 @@ const LeadCardsPanelComponent: React.FC<LeadCardsPanelProps> = ({
       lead={lead}
       profile={leadProfiles[lead]}
       stageMods={stageMods}
+      qrsPattern={qrsPattern}
       manualMode={manualMode}
       manualState={manualStates[lead] ?? 'normal'}
       isRecommendedExtra={recommendedExtraLeads.includes(lead as ExtraLeadId)}

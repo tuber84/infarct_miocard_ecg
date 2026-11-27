@@ -20,7 +20,9 @@ export type ManualLeadState = 'normal' | 'ste' | 'std' | 'tinv';
 
 export type Dominance = 'right' | 'left';
 
-export type SyndromeCategory = 'stemi' | 'nstemi' | 'normal';
+export type SyndromeCategory = 'stemi' | 'nstemi' | 'mimic' | 'normal';
+
+export type QrsPattern = 'normal' | 'lbbb';
 
 export type LesionType = 'none' | 'occlusion' | 'subocclusion' | 'stenosis';
 
@@ -41,7 +43,12 @@ export type CaseId =
   | 'nstemi_tinv'
   | 'wellens_a'
   | 'wellens_b'
-  | 'de_winter';
+  | 'de_winter'
+  | 'lbbb_sgarbossa'
+  | 'lbbb_benign'
+  | 'pericarditis'
+  | 'early_repol'
+  | 'takotsubo';
 
 export type StShape =
   | 'normal'
@@ -82,6 +89,18 @@ export interface LeadShiftProfile {
   deWinterT?: number;
   /** Ветка генератора для учебного варианта субэндокардиальной депрессии без Q */
   isSubendocardial?: boolean;
+  /** Постоянное фоновое смещение ST в точке J (мм), не зависящее от стадии (напр. дискордантность БЛНПГ) */
+  baseStMm?: number;
+  /** Если true, stMm не масштабируется стадиями времени (статический паттерн) */
+  fixedSt?: boolean;
+  /** Смещение сегмента PR в мм (депрессия при перикардите, подъём в aVR) */
+  prShiftMm?: number;
+  /** Амплитуда зазубрины перед точкой J (мВ, «крючок» fish-hook при СРРЖ) */
+  jNotch?: number;
+  /** Фиксированный базовый зубец T для БЛНПГ (мВ) */
+  tDiscordant?: number;
+  /** Глубина симметричной инверсии T без формирования Q (мВ, синдром Такоцубо) */
+  giantTInversion?: number;
 }
 
 export interface ClinicalInsightsData {
@@ -127,6 +146,8 @@ export interface CoronaryCase {
   defaultHeartRate: number;
   recommendedExtraLeads: ExtraLeadId[];
   clinicalInsights: ClinicalInsightsData;
+  /** Морфология комплекса QRS (стандартный или полная БЛНПГ) */
+  qrsPattern?: QrsPattern;
 }
 
 export interface StagePreset {
@@ -166,6 +187,7 @@ export interface StageModifiers {
 export interface EcgRenderOptions {
   artifacts: boolean;
   aivr: boolean;
+  qrsPattern?: QrsPattern;
 }
 
 export interface LocalizationResult {

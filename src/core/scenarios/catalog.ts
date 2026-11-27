@@ -12,7 +12,8 @@ export const GUIDELINE_SOURCES = {
 export const ATLAS_SCENARIOS: AtlasScenario[] = CASE_ORDER.map((profileId) => {
   const profile = CORONARY_CASES[profileId];
   const guidance = getClinicalGuidance(profileId);
-  const guidelineId: GuidelineId = profile.category === 'stemi' ? 'ru-stemi-2024' : 'ru-nste-2024';
+  const guidelineId: GuidelineId =
+    profile.category === 'stemi' || profile.category === 'mimic' ? 'ru-stemi-2024' : 'ru-nste-2024';
   return {
     schemaVersion: 1,
     id: `atlas:${profileId}`,
