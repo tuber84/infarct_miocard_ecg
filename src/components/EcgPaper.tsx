@@ -39,6 +39,8 @@ interface CaliperBox {
   y2: number;
 }
 
+const MIN_BASE_PX_PER_MM = 4.2;
+
 const EcgPaperComponent: React.FC<EcgPaperProps> = ({
   lockedClinicalSettings = false,
   leadProfiles,
@@ -64,6 +66,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
   const [caliperEnabled, setCaliperEnabled] = useState(false);
   const [caliper, setCaliper] = useState<CaliperBox | null>(null);
   const [snapshot, setSnapshot] = useState<EcgSnapshot | null>(null);
+  const [viewportWidth, setViewportWidth] = useState<number>(0);
   const pointerIdRef = useRef<number | null>(null);
   const previousCaliperRef = useRef<CaliperBox | null>(null);
   const zoomRef = useRef(zoom);
@@ -71,14 +74,37 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
   const pendingScrollRef = useRef<number | null>(null);
   const pinchActiveRef = useRef(false);
 
+  useEffect(() => {
+    const el = paperViewportRef.current;
+    if (!el) return;
+    const syncWidth = (rawWidth: number) => {
+      const next = Math.floor(rawWidth);
+      if (next > 0) {
+        setViewportWidth((prev) => (Math.abs(next - prev) >= 2 ? next : prev));
+      }
+    };
+    syncWidth(el.clientWidth);
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (rect) syncWidth(rect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const totalPaperMmX = 264;
   const rowsCount = layout === '3x4' ? 4 : 6;
   const rowHeightMm = layout === '3x4' ? 32 : 28;
   const extraHeightMm = showExtraRow ? 32 : 0;
   const totalPaperMmY = 12 + rowsCount * rowHeightMm + extraHeightMm + 10;
 
-  const basePxPerMm = 4.2;
+  const basePxPerMm =
+    viewportWidth > 0
+      ? Math.max(MIN_BASE_PX_PER_MM, (viewportWidth - 1) / totalPaperMmX)
+      : MIN_BASE_PX_PER_MM;
   const pxPerMm = basePxPerMm * zoom;
+  const scaleRatio = pxPerMm / MIN_BASE_PX_PER_MM;
   const canvasWidth = Math.round(totalPaperMmX * pxPerMm);
   const canvasHeight = Math.round(totalPaperMmY * pxPerMm);
 
@@ -278,7 +304,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
 
     drawEcgWaveforms(ctx, {
       pxPerMm,
-      scaleRatio: zoom,
+      scaleRatio,
       layout,
       rowsCount,
       rowHeightMm,
@@ -636,8 +662,8 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
           }}>{label}</button>)}
       </div>
       <p className="px-3 py-2 text-xs text-slate-600 md:hidden dark:text-slate-400">{caliperEnabled ? 'Проведите пальцем по ЭКГ для измерения. Двумя пальцами меняйте масштаб. Для прокрутки выключите калипер.' : 'Листайте ленту по горизонтали. Разведите или сведите два пальца для изменения масштаба.'}</p>
-      <div ref={paperViewportRef} data-ecg-viewport className="relative max-w-full overflow-x-auto bg-[#fff9f9]">
-        <div ref={stageRef} className="relative inline-block">
+      <div ref={paperViewportRef} data-ecg-viewport className="relative max-w-full overflow-x-auto bg-slate-100 dark:bg-slate-950/60">
+        <div ref={stageRef} className="relative mx-auto block w-fit bg-[#fff9f9] shadow-sm">
           <canvas
             ref={canvasRef}
             aria-label="Лента ЭКГ"
