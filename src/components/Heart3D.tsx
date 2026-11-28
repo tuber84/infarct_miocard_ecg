@@ -54,6 +54,7 @@ import {
   resolveCaseForDominance,
 } from '../core/content/coronaryCases';
 import { CaseId, Dominance } from '../core/types';
+import type { TrainingAngiographyView } from '../core/scenarios/types';
 import {
   CArmAngles,
   cArmAnglesToPosition,
@@ -70,6 +71,13 @@ interface Heart3DProps {
   reperfused: boolean;
   dominance: Dominance;
   isDark?: boolean;
+  exercise?: {
+    targets: readonly CaseId[];
+    selected?: CaseId;
+    revealed: boolean;
+    recordedView?: TrainingAngiographyView;
+    onAcquire?: (view: TrainingAngiographyView | undefined) => void;
+  };
 }
 
 type ViewMode = 'anatomy' | 'angio';
@@ -455,6 +463,7 @@ function computeLandmarksForDominance(
 
 function HeartSceneContent({
   activeCaseId,
+  exercise,
   onSelectCase,
   timeline,
   reperfused,
@@ -875,8 +884,14 @@ function HeartSceneContent({
   }, [bolusNonce]);
 
   // Пересчёт цветов вне кадра; в useFrame допускается только короткая анимация болюса.
+  const hasContrast = !exercise || Boolean(exercise.recordedView);
   useEffect(() => {
     if (!modelGroup) return;
+    if (!hasContrast) {
+      bolusAnimatingRef.current = false;
+      applyArteryColors(-1);
+      return;
+    }
     applyArteryColors(bolusAnimatingRef.current ? bolusProgressRef.current : 2.1);
   }, [
     modelGroup,
@@ -887,6 +902,7 @@ function HeartSceneContent({
     viewMode,
     dominance,
     rentropGrade,
+    hasContrast,
     applyArteryColors,
   ]);
 
@@ -954,6 +970,34 @@ function HeartSceneContent({
           isActive;
 
         if (viewMode === 'angio' && !visibleInAngio) return null;
+
+        if (exercise) {
+          const index = exercise.targets.indexOf(lm.caseId);
+          if (index < 0 || (!exercise.revealed && !exercise.recordedView) ||
+            (!exercise.revealed && angioSystem !== 'BOTH' && (angioSystem === 'LCA') !== isLmcaOrLad)) return null;
+          const correct = exercise.revealed && isActive;
+          const selected = exercise.selected === lm.caseId;
+          if (exercise.revealed && !correct && !selected) return null;
+          return (
+            <Html key={lm.caseId} position={lm.worldPos} center zIndexRange={[10, 0]}>
+              <button
+                type="button"
+                disabled={exercise.revealed}
+                aria-label={`Точка КАГ ${index + 1}`}
+                aria-pressed={selected}
+                onClick={() => onSelectCase(lm.caseId)}
+                className={`flex min-h-8 min-w-8 items-center justify-center rounded-full border-2 text-xs font-bold shadow-md ${
+                  correct ? 'border-emerald-300 bg-emerald-800 text-white' :
+                  selected ? 'border-amber-300 bg-amber-800 text-white' :
+                  'border-sky-200 bg-slate-900 text-sky-100 hover:bg-sky-700'
+                }`}
+              >{index + 1}</button>
+              {correct && <span className="absolute left-full top-1 ml-1 whitespace-nowrap rounded bg-emerald-950 px-2 py-1 text-xs font-semibold text-emerald-100">
+                {ARTERY_LABELS[landmarkDefs[lm.caseId]!.mesh].shortRu} · TIMI 0
+              </span>}
+            </Html>
+          );
+        }
 
         const effectiveWorldPos =
           isActive && isLeftDominantNstemiInf && lcxLandmark
@@ -1187,17 +1231,20 @@ const HeartCanvasViewport: React.FC<HeartCanvasViewportProps> = React.memo(
 );
 
 const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('anatomy');
-  const [angioSystem, setAngioSystem] = useState<AngioSystem>('LCA');
+  const exercise = props.exercise;
+  const isExercise = Boolean(exercise);
+  const savedView = exercise?.recordedView;
+  const [viewMode, setViewMode] = useState<ViewMode>(exercise ? 'angio' : 'anatomy');
+  const [angioSystem, setAngioSystem] = useState<AngioSystem>(savedView?.system ?? (exercise ? 'BOTH' : 'LCA'));
   const [showDistalGhost, setShowDistalGhost] = useState(false);
   const [bolusNonce, setBolusNonce] = useState(0);
 
   const [selectedProjectionId, setSelectedProjectionId] = useState<AngioProjectionId>('ap');
-  const [targetAngles, setTargetAngles] = useState<CArmAngles>({ laoDeg: 0, cranDeg: 0 });
-  const [liveAngles, setLiveAngles] = useState<CArmAngles>({ laoDeg: 0, cranDeg: 0 });
+  const [targetAngles, setTargetAngles] = useState<CArmAngles>(savedView ?? { laoDeg: 0, cranDeg: 0 });
+  const [liveAngles, setLiveAngles] = useState<CArmAngles>(targetAngles);
   const [commandNonce, setCommandNonce] = useState(0);
   const [recenterNonce, setRecenterNonce] = useState(0);
-  const [instantMove, setInstantMove] = useState(false);
+  const [instantMove, setInstantMove] = useState(!!savedView);
 
   const [labelMode, setLabelMode] = useState<LabelMode>('active');
   const [rentropGrade, setRentropGrade] = useState<RentropGrade>(0);
@@ -1233,6 +1280,13 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
   const handleAnglesLiveChange = useCallback((angles: CArmAngles) => {
     setLiveAngles(angles);
   }, []);
+
+  const onAcquire = exercise?.onAcquire;
+  useEffect(() => {
+    if (!onAcquire || !savedView) return;
+    if (savedView.system !== angioSystem || Math.abs(savedView.laoDeg - liveAngles.laoDeg) > 2 ||
+      Math.abs(savedView.cranDeg - liveAngles.cranDeg) > 2) onAcquire(undefined);
+  }, [angioSystem, liveAngles.laoDeg, liveAngles.cranDeg, onAcquire, savedView]);
 
   const lcaProjections = useMemo(
     () => ANGIO_PROJECTIONS.filter((p) => p.system === 'LCA'),
@@ -1272,11 +1326,16 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
   };
 
   useEffect(() => {
-    if (viewMode === 'angio') {
+    if (!isExercise && viewMode === 'angio') {
       const opt = getOptimalProjectionForCase(props.activeCaseId, props.dominance);
       setAngioSystem(opt.system);
     }
-  }, [props.activeCaseId, props.dominance, viewMode]);
+  }, [props.activeCaseId, props.dominance, viewMode, isExercise]);
+
+  const handleBolus = () => {
+    setBolusNonce((n) => n + 1);
+    onAcquire?.({ laoDeg: liveAngles.laoDeg, cranDeg: liveAngles.cranDeg, system: angioSystem });
+  };
 
   const handleSliderChange = (next: Partial<CArmAngles>) => {
     setInstantMove(true);
@@ -1339,7 +1398,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
     <div className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
       {/* Шапка 3D-окна */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
-        <div className="flex flex-wrap items-center gap-2">
+        {!exercise && <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] dark:border-slate-700 dark:bg-slate-800">
             <button
               type="button"
@@ -1385,7 +1444,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                     ? 'Субокклюзия · TIMI 1–2'
                     : 'Крит. стеноз · TIMI 2–3'}
           </span>
-        </div>
+        </div>}
 
         <div className="flex flex-wrap items-center gap-1 text-[11px]">
           {viewMode === 'angio' ? (
@@ -1410,14 +1469,15 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               </div>
               <button
                 type="button"
-                onClick={() => setBolusNonce((n) => n + 1)}
+                onClick={handleBolus}
+                disabled={!loaded}
                 title="Анимация заполнения контрастом от устья до зоны окклюзии"
                 className="flex items-center gap-1 rounded-md bg-slate-900 px-2 py-1 font-semibold text-white hover:bg-slate-800 dark:bg-sky-700 dark:hover:bg-sky-600"
               >
                 <Play className="h-3 w-3 text-sky-400 dark:text-white" />
                 Болюс
               </button>
-              <button
+              {!exercise && <button
                 type="button"
                 onClick={() => setShowDistalGhost((v) => !v)}
                 title="Показать бледный контур сосуда дистальнее тромба"
@@ -1428,7 +1488,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                 }`}
               >
                 Контур дист.
-              </button>
+              </button>}
               <button
                 type="button"
                 onClick={() => setShowFluoroLandmarks((v) => !v)}
@@ -1441,7 +1501,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               >
                 Ориентиры
               </button>
-              {activeLesionType === 'occlusion' && !props.reperfused && (
+              {!exercise && activeLesionType === 'occlusion' && !props.reperfused && (
                 <button
                   type="button"
                   onClick={cycleRentropGrade}
@@ -1458,7 +1518,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
             </>
           ) : null}
 
-          <button
+          {!exercise && <button
             type="button"
             onClick={cycleLabelMode}
             title={
@@ -1486,7 +1546,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               : labelMode === 'off'
                 ? 'Подписи выкл.'
                 : 'Все подписи'}
-          </button>
+          </button>}
 
           <button
             type="button"
@@ -1504,7 +1564,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
         </div>
       </div>
 
-      <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">3D показывает поражённые сосуды; зоны миокарда — на схеме AHA.{props.dominance === 'left' ? ' Левый тип показан условно: форма сосудов фиксирована.' : ''}</p>
+      {!exercise && <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">3D показывает поражённые сосуды; зоны миокарда — на схеме AHA.{props.dominance === 'left' ? ' Левый тип показан условно: форма сосудов фиксирована.' : ''}</p>}
       {/* 3D Canvas + Флюороскопический HUD */}
       <div
         ref={canvasContainerRef}
@@ -1589,6 +1649,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
         <HeartCanvasViewport
           isVisible={isVisible}
           activeCaseId={props.activeCaseId}
+          exercise={exercise}
           onSelectCase={props.onSelectCase}
           timeline={props.timeline}
           reperfused={props.reperfused}
@@ -1616,10 +1677,10 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
           }`}
         >
           <span className="hidden sm:inline">
-            ЛКМ — вращать · ПКМ — перемещать · Колесо — зум · Клик по точке — окклюзия
+            ЛКМ — вращать · ПКМ — перемещать · Колесо — зум{exercise ? '' : ' · Клик по точке — окклюзия'}
           </span>
           <span className="sm:hidden">
-            1 палец — вращать · 2 пальца — зум/сдвиг · Тап по точке — поражение
+            1 палец — вращать · 2 пальца — зум/сдвиг{exercise ? '' : ' · Тап по точке — поражение'}
           </span>
         </div>
       </div>
@@ -1681,14 +1742,14 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               Центр
             </button>
 
-            <button
+            {!exercise && <button
               type="button"
               onClick={handleOptimalForCase}
               title={optimalInfo.reason}
               className="rounded-md bg-red-700 px-2 py-0.5 text-[10.5px] font-bold text-white shadow-sm hover:bg-red-800"
             >
               Оптимум для ИСА: {optimalProjTitle}
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -1744,7 +1805,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
         </div>
 
         {/* Сворачиваемый справочник активной проекции + сравнительная таблица */}
-        <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        {!exercise && <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5">
             <button
               type="button"
@@ -1881,7 +1942,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               )}
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );

@@ -251,6 +251,9 @@ export function AtlasView({
   const snapshotLabel = manualMode
     ? 'Ручной профиль ЭКГ'
     : `${resolvedCase.caseData.shortTitle} · ${nearestStage.label}${reperfused ? ' (ЧКВ)' : ''}`;
+  const comparisonContext = manualMode
+    ? `${dominance}:ручной:${JSON.stringify(Object.entries(manualStates).sort())}`
+    : dominance;
   const exportMeta = useMemo(
     () => ({
       title: manualMode ? 'КардиоАтлас ЭКГ · Ручной анализ' : resolvedCase.caseData.shortTitle,
@@ -323,14 +326,14 @@ export function AtlasView({
           </div>
 
           {/* Выбор клинического сценария и типа кровоснабжения */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2.5">
             <select
               value={manualMode ? 'custom' : activeCaseId}
               onChange={(e) => {
                 const val = e.target.value;
                 if (val !== 'custom') handleSelectCase(val as CaseId);
               }}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 shadow-sm focus:border-red-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 shadow-sm focus:border-red-600 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             >
               {manualMode && (
                 <option value="custom">Ручной подбор по отведениям</option>
@@ -733,6 +736,7 @@ export function AtlasView({
           showExtraRow={showExtraRow}
           onToggleExtraRow={handleToggleExtraRow}
           snapshotLabel={snapshotLabel}
+          comparisonContext={comparisonContext}
           exportMeta={exportMeta}
         />
 

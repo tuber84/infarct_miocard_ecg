@@ -1,4 +1,5 @@
-import type { ClinicalCaseScenario } from './types';
+import { STANDARD_LEADS } from '../content/coronaryCases';
+import type { ClinicalCaseScenario, ClinicalStep, TrainingAnswerEvidence } from './types';
 
 export interface TrainingAttempt {
   formatVersion: 1;
@@ -9,7 +10,7 @@ export interface TrainingAttempt {
   startedAt: string;
   updatedAt: string;
   stepIndex: number;
-  answers: Record<string, { choiceId: string; answeredAt: string }>;
+  answers: Record<string, { choiceId: string; answeredAt: string; evidence?: TrainingAnswerEvidence }>;
   completedAt: string | null;
 }
 
@@ -19,13 +20,31 @@ export function createAttempt(s: ClinicalCaseScenario, id: string, now: string):
     startedAt: now, updatedAt: now, stepIndex: 0, answers: {}, completedAt: null };
 }
 
-export function answerQuestion(s: ClinicalCaseScenario, a: TrainingAttempt, choiceId: string, now: string): TrainingAttempt {
+function validateEvidence(step: ClinicalStep, evidence?: TrainingAnswerEvidence): boolean {
+  if (step.kind === 'ecg' && step.markLeads) {
+    const leads = evidence?.markedLeads;
+    return Array.isArray(leads) && leads.length > 0 && !evidence?.angiography &&
+      new Set(leads).size === leads.length && leads.every(lead => STANDARD_LEADS.includes(lead));
+  }
+  if (step.kind === 'angiography') {
+    const view = evidence?.angiography;
+    return !!view && !evidence?.markedLeads &&
+      ['LCA', 'RCA', 'BOTH'].includes(view.system) &&
+      Number.isInteger(view.laoDeg) && Math.abs(view.laoDeg) <= 180 &&
+      Number.isInteger(view.cranDeg) && Math.abs(view.cranDeg) <= 90;
+  }
+  return evidence === undefined;
+}
+
+export function answerQuestion(s: ClinicalCaseScenario, a: TrainingAttempt, choiceId: string, now: string, evidence?: TrainingAnswerEvidence): TrainingAttempt {
   if (!restoreAttempt(s, a)) throw new Error('Попытка несовместима со сценарием.');
-  const q = s.steps[a.stepIndex]?.question;
+  const step = s.steps[a.stepIndex];
+  const q = step?.question;
   if (a.completedAt || !q || a.answers[q.id] || !q.choices.some(c => c.id === choiceId)) {
     throw new Error('Этот ответ нельзя принять на текущем этапе.');
   }
-  return { ...a, updatedAt: now, answers: { ...a.answers, [q.id]: { choiceId, answeredAt: now } } };
+  if (!validateEvidence(step, evidence)) throw new Error('Сначала отметьте отведения или выполните контрастирование.');
+  return { ...a, updatedAt: now, answers: { ...a.answers, [q.id]: { choiceId, answeredAt: now, ...(evidence && { evidence }) } } };
 }
 
 export function advanceAttempt(s: ClinicalCaseScenario, a: TrainingAttempt, now: string): TrainingAttempt {
@@ -46,17 +65,22 @@ export function getTrainingView(s: ClinicalCaseScenario, a: TrainingAttempt) {
     const question = item.question;
     if (!question || !a.answers[question.id]) return [];
     const selected = a.answers[question.id].choiceId;
-    return [{ questionId: question.id, prompt: question.prompt, choice: question.choices.find(c => c.id === selected)!.text,
-      correct: question.acceptedChoiceIds.includes(selected), explanation: question.explanation, references: question.references }];
+    return [{ questionId: question.id, prompt: question.prompt, choiceId: selected, choice: question.choices.find(c => c.id === selected)!.text,
+      correct: question.acceptedChoiceIds.includes(selected), explanation: question.explanation, references: question.references,
+      evidence: a.answers[question.id].evidence }];
   });
   return {
     title: s.title, patient: s.patient, step: current ? step : null,
     question: q ? { id: q.id, prompt: q.prompt, choices: q.choices } : null,
     selectedChoiceId: answer?.choiceId,
+    evidence: answer?.evidence,
     feedback: answer && q ? { correct: q.acceptedChoiceIds.includes(answer.choiceId), explanation: q.explanation, references: q.references } : null,
     canAdvance: !!current && (!q || !!answer),
     completed: !!a.completedAt,
     debrief: a.completedAt ? s.debrief : null,
+    reviewSteps: a.completedAt && s.steps.some(item => item.kind === 'angiography')
+      ? s.steps.filter(item => item.kind === 'ecg' || item.kind === 'angiography')
+      : [],
     results: a.completedAt ? results : [],
     score: results.filter(r => r.correct).length,
     totalQuestions: s.steps.filter(item => item.question).length,
@@ -76,12 +100,14 @@ export function restoreAttempt(s: ClinicalCaseScenario, raw: unknown): TrainingA
   if (completed ? !date(a.completedAt) : a.completedAt !== null) return null;
   const allowed = new Set<string>();
   for (let i = 0; i < s.steps.length; i++) {
-    const q = s.steps[i].question;
+    const step = s.steps[i];
+    const q = step.question;
     if (!q) continue;
     const answer = a.answers[q.id];
     if (i < a.stepIndex && !answer) return null;
     if (answer) {
-      if (i > a.stepIndex || typeof answer !== 'object' || !q.choices.some(c => c.id === answer.choiceId) || !date(answer.answeredAt)) return null;
+      if (i > a.stepIndex || typeof answer !== 'object' || !q.choices.some(c => c.id === answer.choiceId) ||
+        !date(answer.answeredAt) || !validateEvidence(step, answer.evidence)) return null;
       allowed.add(q.id);
     }
   }
@@ -89,5 +115,10 @@ export function restoreAttempt(s: ClinicalCaseScenario, raw: unknown): TrainingA
   // Не переносим неизвестные поля и сохранённые вычисленные оценки.
   return { formatVersion: 1, id: a.id, scenarioId: s.id, scenarioRevision: s.revision, scenarioSchemaVersion: s.schemaVersion,
     startedAt: a.startedAt, updatedAt: a.updatedAt, stepIndex: a.stepIndex,
-    answers: Object.fromEntries(Object.entries(a.answers).map(([id, v]) => [id, { choiceId: v.choiceId, answeredAt: v.answeredAt }])), completedAt: a.completedAt };
+    answers: Object.fromEntries(Object.entries(a.answers).map(([id, v]) => {
+      const { angiography, markedLeads } = v.evidence ?? {};
+      const evidence = angiography ? { angiography: { system: angiography.system, laoDeg: angiography.laoDeg, cranDeg: angiography.cranDeg } }
+        : markedLeads ? { markedLeads: [...markedLeads] } : undefined;
+      return [id, { choiceId: v.choiceId, answeredAt: v.answeredAt, ...(evidence && { evidence }) }];
+    })), completedAt: a.completedAt };
 }

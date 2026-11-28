@@ -8,4 +8,5 @@ export * from './scenarios/types';
 export * from './scenarios/catalog';
 export * from './scenarios/validate';
 export * from './scenarios/firstCase';
+export * from './scenarios/posteriorCase';
 export * from './scenarios/training';

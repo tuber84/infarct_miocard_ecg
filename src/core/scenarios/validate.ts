@@ -1,4 +1,4 @@
-import { CORONARY_CASES } from '../content/coronaryCases';
+import { CORONARY_CASES, EXTRA_LEADS } from '../content/coronaryCases';
 import { GUIDELINE_SOURCES } from './catalog';
 import type { ClinicalScenario, SourceReference } from './types';
 
@@ -36,6 +36,16 @@ export function validateScenario(scenario: ClinicalScenario): string[] {
       check(step.profileId in CORONARY_CASES, 'Неизвестный профиль ЭКГ');
       check(Number.isFinite(step.timeline) && step.timeline >= 0 && step.timeline <= 1, 'Этап ЭКГ вне диапазона');
       check(Number.isFinite(step.heartRate) && step.heartRate >= 40 && step.heartRate <= 150, 'ЧСС ЭКГ вне диапазона генератора');
+      if (step.extraLeads) check(step.showExtraLeads === true && step.extraLeads.length > 0 &&
+        step.extraLeads.every(id => EXTRA_LEADS.includes(id)) && new Set(step.extraLeads).size === step.extraLeads.length, 'Некорректные дополнительные отведения');
+      if (step.markLeads) check(!!step.question, 'Для разметки отведений нужен вопрос');
+    }
+    if (step.kind === 'angiography') {
+      check(step.profileId in CORONARY_CASES && step.targets.includes(step.profileId), 'Не задана цель КАГ');
+      check(step.targets.length >= 2 && new Set(step.targets).size === step.targets.length &&
+        step.targets.every(id => id in CORONARY_CASES) &&
+        step.question?.choices.length === step.targets.length &&
+        step.question.choices.every(choice => step.targets.some(id => id === choice.id)), 'Точки на КАГ не совпадают с вариантами ответа');
     }
     if (step.kind === 'result') refs(step.references, step.id);
     if (step.question) {

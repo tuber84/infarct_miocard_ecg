@@ -1,4 +1,4 @@
-import type { CaseId, Dominance } from '../types';
+import type { CaseId, Dominance, ExtraLeadId, StandardLeadId } from '../types';
 
 export type GuidelineId = 'ru-stemi-2024' | 'ru-nste-2024';
 
@@ -49,13 +49,25 @@ export interface ScenarioQuestion {
   references: SourceReference[];
 }
 
+export interface TrainingAngiographyView {
+  system: 'LCA' | 'RCA' | 'BOTH';
+  laoDeg: number;
+  cranDeg: number;
+}
+
+export interface TrainingAnswerEvidence {
+  markedLeads?: StandardLeadId[];
+  angiography?: TrainingAngiographyView;
+}
+
 export type ClinicalStep = {
   id: string;
   title: string;
   question?: ScenarioQuestion;
 } & (
   | { kind: 'information'; text: string }
-  | { kind: 'ecg'; profileId: CaseId; dominance: Dominance; timeline: number; reperfused: boolean; heartRate: number; showExtraLeads?: boolean }
+  | { kind: 'ecg'; profileId: CaseId; dominance: Dominance; timeline: number; reperfused: boolean; heartRate: number; showExtraLeads?: boolean; extraLeads?: ExtraLeadId[]; markLeads?: boolean }
+  | { kind: 'angiography'; profileId: CaseId; dominance: Dominance; targets: CaseId[] }
   | { kind: 'result'; modality: 'troponin' | 'echo' | 'angiography'; text: string; references: SourceReference[] }
 );
 

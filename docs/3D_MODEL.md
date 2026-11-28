@@ -24,6 +24,12 @@
 
 Для экспорта: Normal SOP → glTF ROP Output, `Build Hierarchy from Attribute` включён, `Path Attribute = name`, Draco выключен. Все примитивы должны иметь непустой `name`. Старый конвертер ниже предназначен только для предыдущего исходника.
 
+## Рабочие файлы для ZBrush
+
+В `export_zbrush/` находятся FBX сердца правого и левого типов, правка `LCx0.fbx` и проект `heart_left.zpr`. Чтобы открыть FBX в ZBrush, используйте **Zplugin → FBX ExportImport → Import**. Именованные меши импортируются отдельными SubTool, а вершинные цвета передаются как Polypaint.
+
+`scripts/export_to_zbrush.py` запускается через `hython` из Houdini. Скрипт перезаписывает два FBX в `export_zbrush/`. Для правого типа он берёт `public/models/heart/heart_segmented.glb`. Для левого требуется локально подготовленная полная модель `.tools/heart_left_auto/heart_segmented_left_type_auto.glb` с миокардом. В веб-атласе для левого типа используется `public/models/heart/heart_artery_left_type.glb` с артериями поверх общего миокарда.
+
 ## Предыдущая модель
 
 Документация по устройству оптимизированной модели `public/models/heart/heart_optimized.glb`, скрипту конвертации `scripts/convert_geo_to_glb.py` и обработке сцены в `src/components/Heart3D.tsx`.

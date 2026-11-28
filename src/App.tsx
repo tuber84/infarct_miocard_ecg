@@ -190,6 +190,7 @@ export default function App() {
         {mode === 'training' ? (
           <TrainingPanel
             onOpenAtlas={(id) => navigateToMode('atlas', id)}
+            isDark={theme === 'dark'}
             panel={trainingPanel}
             onPanelChange={handleTrainingPanelChange}
           />

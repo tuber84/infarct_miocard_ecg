@@ -17,7 +17,7 @@
    - Локальный запуск Electron: `npm run electron:start`
    - Сборка Windows Portable `.exe`: `npm run dist:win`
 4. **Дополнительная документация:**
-   - [docs/TRAINING.md](docs/TRAINING.md) — первый клинический случай, состояния попытки, хранение и проверки.
+   - [docs/TRAINING.md](docs/TRAINING.md) — клинические случаи, состояния попытки, отметки ЭКГ, выбор проекции КАГ, хранение и проверки.
    - [docs/CORE.md](docs/CORE.md) — независимое ядро, публичные экспорты, структура сценариев и проверки границ.
    - [README.md](README.md) — обзор, возможности (ИМпST + ИМбпST) и структура.
    - [docs/CLINICAL_ENGINE.md](docs/CLINICAL_ENGINE.md) — математика ЭКГ, стадии, ИМбпST/Велленс/де Винтер, ЧКВ и локализатор.
@@ -69,7 +69,7 @@
 | Настроить морфологию волн (de Winter, Wellens, Sgarbossa, Brugada) | `src/core/types.ts` (`StShape`, `LeadShiftProfile`), `src/core/ecg/ecgEngine.ts` (`sampleBeatMv`, `getLeadBadge`) |
 | Изменить стадии времени или эффект ЧКВ (TIMI 3) | `src/core/ecg/ecgEngine.ts` (`STAGE_PRESETS`, `NSTEMI_STAGE_SUMMARIES`, `DE_WINTER_STAGE_SUMMARIES`, `NATURAL_KEYFRAMES`, `REPERFUSED_KEYFRAMES`, `computeStageModifiers`), `src/components/TimelineBar.tsx` |
 | Добавить отведения / поменять сетку бумаги, печать, «Было/Стало» или калипер | `src/components/EcgPaper.tsx`, `src/utils/ecgPaperRender.ts`, `src/components/CabreraCircle.tsx`, `src/index.css`, `src/core/ecg/ecgEngine.ts` (`NORMAL_LEAD_BASE`, `computeFrontalVectors`) |
-| Изменить 3D-проекции КАГ, ПКМ-панорамирование, коллатерали Rentrop, ориентиры или подписи | `src/data/angiographyProjections.ts`, `src/utils/cArmMath.ts`, `src/components/CArmDiagram.tsx`, `src/components/Heart3D.tsx` (`ArteryLabel`, `FluoroscopyLandmarks`, `CameraRig`, `LabelMode`), `src/presentation/segmentedHeart.ts`, `src/presentation/arteryLabels.ts` |
+| Изменить 3D-проекции КАГ, ПКМ-панорамирование, коллатерали Rentrop, ориентиры или подписи | `src/data/angiographyProjections.ts`, `src/utils/cArmMath.ts`, `src/components/CArmDiagram.tsx`, `src/components/Heart3D.tsx` (`ArteryLabel`, `HeartSceneContent`, `CameraRig`, `LabelMode`), `src/presentation/segmentedHeart.ts`, `src/presentation/arteryLabels.ts` |
 | Заменить 3D-модель сердца (напр., `.glb` из Houdini) | `public/models/heart/`, `src/components/Heart3D.tsx` (см. `docs/3D_MODEL.md`) |
 | Настроить светлую / тёмную тему интерфейса | `tailwind.config.js` (`darkMode: 'class'`), `index.html` (скрипт до рендера), `src/platform/theme.ts`, `src/App.tsx`, `src/index.css`, а также проп `isDark` в `Heart3D.tsx`, `AhaBullseye.tsx` и `CabreraCircle.tsx` |
 | Обновить сборку Windows `.exe` (Electron) | `electron/main.cjs`, `package.json` (`build`, `scripts`), `build/icon.ico` (см. `docs/DESKTOP_BUILD.md`) |
@@ -148,6 +148,7 @@
 ### M. Офлайн-PWA для iPhone и GitHub Pages
 - В `vite.config.ts` задана относительная база `base: './'` и плагин `cardioAtlasPwaPlugin()`, генерирующий `dist/sw.js` с хэшем контента и полным precache `dist/`. Не используйте абсолютные пути вида `/models/...` или `/icons/...` — только `./...` или `import.meta.env.BASE_URL`, иначе деплой на подпуть `/infarct_miocard_ecg/` сломается.
 - `registerPwaServiceWorker()` в `src/platform/pwa.ts` регистрирует `./sw.js` только в production при `https:` / `localhost` (пропуская Vite dev, Electron `app:` и `isNativeMobile`).
+- Карточка ссылки задаётся в `index.html`. Для `og:image` используется публичный HTTPS-адрес изображения на GitHub Pages. Фавиконка и манифест подключаются относительными путями. Подробнее в [docs/IOS_PWA.md](docs/IOS_PWA.md#карточка-ссылки-и-фавиконка).
 - `viewport-fit=cover` в `index.html` требует сохранения `.safe-top`, `.safe-bottom` и `.safe-x` в `src/index.css` (это также затрагивает `SystemBars` на Android WebView >= 140). Подробнее см. [docs/IOS_PWA.md](docs/IOS_PWA.md).
 
 ## 5. Чек-лист перед завершением любой правки

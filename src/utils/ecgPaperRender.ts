@@ -8,7 +8,9 @@ import {
   sampleBeatMv,
 } from '../core/ecg/ecgEngine';
 import {
+  CaseId,
   EcgRenderOptions,
+  ExtraLeadId,
   LeadId,
   LeadShiftProfile,
   StageModifiers,
@@ -29,13 +31,17 @@ export const GRID_6X2: LeadId[][] = [
   ['aVF', 'V6'],
 ];
 
-export interface EcgSnapshot {
-  label: string;
+export interface EcgRecording {
   leadProfiles: Partial<Record<LeadId, LeadShiftProfile>>;
   stageMods: StageModifiers;
   heartRate: number;
   options: EcgRenderOptions;
-  maxStMm: number;
+}
+
+export interface EcgSnapshot extends EcgRecording {
+  label: string;
+  caseId: CaseId;
+  comparisonContext?: string;
 }
 
 export interface EcgExportMeta {
@@ -45,16 +51,18 @@ export interface EcgExportMeta {
   criteria: string[];
 }
 
-export function getMaxStandardStMm(
-  leadProfiles: Partial<Record<LeadId, LeadShiftProfile>>,
-  stageMods: StageModifiers
-): number {
-  let maxVal = 0;
-  for (const lid of STANDARD_LEADS) {
-    const val = getJShiftMm(leadProfiles[lid], stageMods);
-    if (val > maxVal) maxVal = val;
+export function getInitialComparisonLead({ leadProfiles, stageMods }: EcgRecording): LeadId {
+  let lead: LeadId = 'II';
+  let largestShift = 0;
+  for (const id of STANDARD_LEADS) {
+    const shift = getJShiftMm(leadProfiles[id], stageMods);
+    // При отсутствии подъёма выбираем наиболее выраженную депрессию.
+    if (shift > Math.max(0, largestShift) || (largestShift <= 0 && shift < largestShift)) {
+      lead = id;
+      largestShift = shift;
+    }
   }
-  return maxVal;
+  return lead;
 }
 
 export interface GridDrawParams {
@@ -68,58 +76,51 @@ export interface GridDrawParams {
   rowHeightMm: number;
   gainMmMv: 10 | 5;
   showExtraRow: boolean;
+  extraLeads?: readonly ExtraLeadId[];
+}
+
+export function drawEcgPaperGrid(
+  gctx: CanvasRenderingContext2D,
+  { canvasWidth, canvasHeight, pxPerMm, totalPaperMmX, totalPaperMmY }: Pick<
+    GridDrawParams, 'canvasWidth' | 'canvasHeight' | 'pxPerMm' | 'totalPaperMmX' | 'totalPaperMmY'
+  >
+) {
+  gctx.fillStyle = '#fff9f9';
+  gctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  for (const step of [1, 5]) {
+    gctx.strokeStyle = step === 1 ? '#f8d4d4' : '#e7a4a4';
+    gctx.lineWidth = step === 1 ? Math.max(0.7, pxPerMm * 0.16) : Math.max(1.1, pxPerMm * 0.25);
+    gctx.beginPath();
+    for (let mm = 0; mm <= totalPaperMmX; mm += step) {
+      if (step === 1 && mm % 5 === 0) continue;
+      const x = mm * pxPerMm;
+      gctx.moveTo(x, 0);
+      gctx.lineTo(x, canvasHeight);
+    }
+    for (let mm = 0; mm <= totalPaperMmY; mm += step) {
+      if (step === 1 && mm % 5 === 0) continue;
+      const y = mm * pxPerMm;
+      gctx.moveTo(0, y);
+      gctx.lineTo(canvasWidth, y);
+    }
+    gctx.stroke();
+  }
 }
 
 export function drawEcgGrid(gctx: CanvasRenderingContext2D, p: GridDrawParams) {
   const {
     canvasWidth,
-    canvasHeight,
     pxPerMm,
-    totalPaperMmX,
-    totalPaperMmY,
     layout,
     rowsCount,
     rowHeightMm,
     gainMmMv,
     showExtraRow,
+    extraLeads = EXTRA_LEADS,
   } = p;
 
-  gctx.fillStyle = '#fff9f9';
-  gctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-  // Мелкая сетка 1 мм
-  gctx.strokeStyle = '#f8d4d4';
-  gctx.lineWidth = Math.max(0.7, pxPerMm * 0.16);
-  gctx.beginPath();
-  for (let mm = 0; mm <= totalPaperMmX; mm += 1) {
-    if (mm % 5 === 0) continue;
-    const x = mm * pxPerMm;
-    gctx.moveTo(x, 0);
-    gctx.lineTo(x, canvasHeight);
-  }
-  for (let mm = 0; mm <= totalPaperMmY; mm += 1) {
-    if (mm % 5 === 0) continue;
-    const y = mm * pxPerMm;
-    gctx.moveTo(0, y);
-    gctx.lineTo(canvasWidth, y);
-  }
-  gctx.stroke();
-
-  // Крупная сетка 5 мм
-  gctx.strokeStyle = '#e7a4a4';
-  gctx.lineWidth = Math.max(1.1, pxPerMm * 0.25);
-  gctx.beginPath();
-  for (let mm = 0; mm <= totalPaperMmX; mm += 5) {
-    const x = mm * pxPerMm;
-    gctx.moveTo(x, 0);
-    gctx.lineTo(x, canvasHeight);
-  }
-  for (let mm = 0; mm <= totalPaperMmY; mm += 5) {
-    const y = mm * pxPerMm;
-    gctx.moveTo(0, y);
-    gctx.lineTo(canvasWidth, y);
-  }
-  gctx.stroke();
+  drawEcgPaperGrid(gctx, p);
 
   const drawCalibrationPulse = (startXMm: number, baselineMm: number) => {
     const hMm = gainMmMv;
@@ -186,11 +187,11 @@ export function drawEcgGrid(gctx: CanvasRenderingContext2D, p: GridDrawParams) {
     gctx.stroke();
 
     drawCalibrationPulse(leftMarginMm, extraBaseMm);
-    const segW = activeWidthMm / EXTRA_LEADS.length;
+    const segW = activeWidthMm / extraLeads.length;
     gctx.strokeStyle = '#64748b';
     gctx.lineWidth = Math.max(1, pxPerMm * 0.22);
     gctx.beginPath();
-    for (let idx = 1; idx < EXTRA_LEADS.length; idx++) {
+    for (let idx = 1; idx < extraLeads.length; idx++) {
       const xMm = signalStartMm + idx * segW;
       gctx.moveTo(xMm * pxPerMm, (extraBaseMm - 12) * pxPerMm);
       gctx.lineTo(xMm * pxPerMm, (extraBaseMm + 7) * pxPerMm);
@@ -208,12 +209,76 @@ export interface WaveDrawParams {
   speedMmSec: 25 | 50;
   gainMmMv: 10 | 5;
   showExtraRow: boolean;
+  extraLeads?: readonly ExtraLeadId[];
   caliperEnabled: boolean;
   leadProfiles: Partial<Record<LeadId, LeadShiftProfile>>;
   stageMods: StageModifiers;
   heartRate: number;
   options: EcgRenderOptions;
   snapshot?: EcgSnapshot | null;
+}
+
+const SAMPLE_RATE = 1000;
+
+function drawLeadTrace(
+  ctx: CanvasRenderingContext2D,
+  signal: Float32Array,
+  x: number,
+  baseline: number,
+  pxPerSample: number,
+  pxPerMv: number,
+  scaleRatio: number,
+  reference = false
+) {
+  ctx.save();
+  ctx.strokeStyle = reference ? 'rgba(2, 132, 199, 0.75)' : '#0f172a';
+  ctx.lineWidth = reference ? Math.max(1.15, 1.25 * scaleRatio) : Math.max(1.25, 1.35 * scaleRatio);
+  ctx.lineJoin = 'bevel';
+  if (reference) ctx.setLineDash([4 * scaleRatio, 3 * scaleRatio]);
+  ctx.beginPath();
+  ctx.moveTo(x, baseline - signal[0] * pxPerMv);
+  for (let i = 1; i < signal.length; i++) {
+    ctx.lineTo(x + i * pxPerSample, baseline - signal[i] * pxPerMv);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+export function drawEcgComparison(
+  canvas: HTMLCanvasElement,
+  lead: LeadId,
+  before: EcgRecording,
+  after: EcgRecording,
+  speedMmSec: number,
+  gainMmMv: number,
+  dpr: number
+) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const durationSec = 1;
+  const makeSignal = ({ leadProfiles, stageMods, heartRate, options }: EcgRecording) =>
+    generateLeadSignal(lead, leadProfiles[lead], stageMods, durationSec, SAMPLE_RATE, heartRate, options);
+  const beforeSignal = makeSignal(before);
+  const afterSignal = makeSignal(after);
+  const upperMm = Math.ceil(Math.max(8, Math.max(...beforeSignal, ...afterSignal) * gainMmMv)) + 2;
+  const lowerMm = Math.ceil(Math.max(8, -Math.min(...beforeSignal, ...afterSignal) * gainMmMv)) + 2;
+  const totalPaperMmX = speedMmSec * durationSec + 4;
+  const totalPaperMmY = upperMm + lowerMm;
+  const canvasWidth = 640;
+  const pxPerMm = canvasWidth / totalPaperMmX;
+  const canvasHeight = Math.ceil(totalPaperMmY * pxPerMm);
+  canvas.width = Math.round(canvasWidth * dpr);
+  canvas.height = Math.round(canvasHeight * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawEcgPaperGrid(ctx, { canvasWidth, canvasHeight, pxPerMm, totalPaperMmX, totalPaperMmY });
+
+  const x = 2 * pxPerMm;
+  const baseline = upperMm * pxPerMm;
+  const pxPerSample = speedMmSec * pxPerMm / SAMPLE_RATE;
+  const pxPerMv = gainMmMv * pxPerMm;
+  drawLeadTrace(ctx, afterSignal, x, baseline, pxPerSample, pxPerMv, 1.8);
+  drawLeadTrace(ctx, beforeSignal, x, baseline, pxPerSample, pxPerMv, 1.8, true);
 }
 
 export function drawEcgWaveforms(ctx: CanvasRenderingContext2D, p: WaveDrawParams) {
@@ -226,6 +291,7 @@ export function drawEcgWaveforms(ctx: CanvasRenderingContext2D, p: WaveDrawParam
     speedMmSec,
     gainMmMv,
     showExtraRow,
+    extraLeads = EXTRA_LEADS,
     caliperEnabled,
     leadProfiles,
     stageMods,
@@ -242,7 +308,10 @@ export function drawEcgWaveforms(ctx: CanvasRenderingContext2D, p: WaveDrawParam
     timeOffsetSec: number
   ) => {
     const durationSec = widthMm / speedMmSec;
-    const sampleRate = 1000;
+    const x = startXMm * pxPerMm;
+    const baseline = baselineMm * pxPerMm;
+    const pxPerSample = speedMmSec * pxPerMm / SAMPLE_RATE;
+    const pxPerMv = gainMmMv * pxPerMm;
 
     // 1. Фоновая кривая «Было» (пунктирный синий контур), если зафиксирован эталон
     if (snapshot) {
@@ -251,26 +320,12 @@ export function drawEcgWaveforms(ctx: CanvasRenderingContext2D, p: WaveDrawParam
         snapshot.leadProfiles[leadId],
         snapshot.stageMods,
         durationSec,
-        sampleRate,
+        SAMPLE_RATE,
         snapshot.heartRate,
         snapshot.options,
         timeOffsetSec
       );
-      ctx.save();
-      ctx.strokeStyle = 'rgba(2, 132, 199, 0.58)';
-      ctx.lineWidth = Math.max(1.15, 1.25 * scaleRatio);
-      ctx.lineJoin = 'bevel';
-      ctx.setLineDash([4 * scaleRatio, 3 * scaleRatio]);
-      ctx.beginPath();
-      for (let i = 0; i < snapSignal.length; i++) {
-        const t = i / sampleRate;
-        const x = (startXMm + t * speedMmSec) * pxPerMm;
-        const y = (baselineMm - snapSignal[i] * gainMmMv) * pxPerMm;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      ctx.restore();
+      drawLeadTrace(ctx, snapSignal, x, baseline, pxPerSample, pxPerMv, scaleRatio, true);
     }
 
     // 2. Текущая кривая
@@ -279,25 +334,13 @@ export function drawEcgWaveforms(ctx: CanvasRenderingContext2D, p: WaveDrawParam
       leadProfiles[leadId],
       stageMods,
       durationSec,
-      sampleRate,
+      SAMPLE_RATE,
       heartRate,
       options,
       timeOffsetSec
     );
 
-    ctx.strokeStyle = '#0f172a';
-    ctx.lineWidth = Math.max(1.25, 1.35 * scaleRatio);
-    ctx.lineJoin = 'bevel';
-    ctx.beginPath();
-
-    for (let i = 0; i < signal.length; i++) {
-      const t = i / sampleRate;
-      const x = (startXMm + t * speedMmSec) * pxPerMm;
-      const y = (baselineMm - signal[i] * gainMmMv) * pxPerMm;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
+    drawLeadTrace(ctx, signal, x, baseline, pxPerSample, pxPerMv, scaleRatio);
 
     if (caliperEnabled) {
       const rr = 60 / getEffectiveHeartRate(heartRate, options.aivr);
@@ -375,8 +418,8 @@ export function drawEcgWaveforms(ctx: CanvasRenderingContext2D, p: WaveDrawParam
   if (showExtraRow) {
     const extraStartY = 12 + rowsCount * rowHeightMm;
     const extraBaseMm = extraStartY + 20;
-    const segW = activeWidthMm / EXTRA_LEADS.length;
-    EXTRA_LEADS.forEach((lid, idx) => {
+    const segW = activeWidthMm / extraLeads.length;
+    extraLeads.forEach((lid, idx) => {
       const xMm = signalStartMm + idx * segW;
       drawLeadSegment(lid, xMm, segW, extraBaseMm, (idx * segW) / speedMmSec);
     });

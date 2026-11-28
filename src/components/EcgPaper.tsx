@@ -1,35 +1,35 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Download, GitCompare, Printer, RotateCcw, Ruler, Sparkles, ZoomIn, ZoomOut } from 'lucide-react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Download, GitCompare, Printer, Ruler, Sparkles, ZoomIn, ZoomOut } from 'lucide-react';
 import { getEcgMeasurements } from '../core/ecg/ecgEngine';
-import {
-  CaseId,
-  EcgRenderOptions,
-  LeadId,
-  LeadShiftProfile,
-  StageModifiers,
-} from '../core/types';
+import { CaseId, ExtraLeadId, LeadId, StandardLeadId } from '../core/types';
 import {
   drawEcgGrid,
   drawEcgWaveforms,
   type EcgExportMeta,
+  type EcgRecording,
   type EcgSnapshot,
   exportEcgToPng,
-  getMaxStandardStMm,
+  getInitialComparisonLead,
+  GRID_3X4,
+  GRID_6X2,
 } from '../utils/ecgPaperRender';
+import EcgStComparison from './EcgStComparison';
 
-interface EcgPaperProps {
+interface EcgPaperProps extends EcgRecording {
   lockedClinicalSettings?: boolean;
   activeCaseId: CaseId;
-  leadProfiles: Partial<Record<LeadId, LeadShiftProfile>>;
-  stageMods: StageModifiers;
-  heartRate: number;
   onChangeHeartRate: (hr: number) => void;
-  options: EcgRenderOptions;
   onToggleArtifacts: () => void;
   showExtraRow: boolean;
   onToggleExtraRow: () => void;
   snapshotLabel?: string;
+  comparisonContext?: string;
   exportMeta?: EcgExportMeta;
+  extraLeads?: readonly ExtraLeadId[];
+  leadMarking?: {
+    marked: readonly StandardLeadId[];
+    onToggle?: (lead: StandardLeadId) => void;
+  };
 }
 
 interface CaliperBox {
@@ -43,6 +43,7 @@ const MIN_BASE_PX_PER_MM = 4.2;
 
 const EcgPaperComponent: React.FC<EcgPaperProps> = ({
   lockedClinicalSettings = false,
+  activeCaseId,
   leadProfiles,
   stageMods,
   heartRate,
@@ -52,7 +53,10 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
   showExtraRow,
   onToggleExtraRow,
   snapshotLabel,
+  comparisonContext,
   exportMeta,
+  extraLeads,
+  leadMarking,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const paperViewportRef = useRef<HTMLDivElement>(null);
@@ -66,6 +70,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
   const [caliperEnabled, setCaliperEnabled] = useState(false);
   const [caliper, setCaliper] = useState<CaliperBox | null>(null);
   const [snapshot, setSnapshot] = useState<EcgSnapshot | null>(null);
+  const [comparisonLead, setComparisonLead] = useState<LeadId>('II');
   const [viewportWidth, setViewportWidth] = useState<number>(0);
   const pointerIdRef = useRef<number | null>(null);
   const previousCaliperRef = useRef<CaliperBox | null>(null);
@@ -268,6 +273,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
       rowHeightMm,
       gainMmMv,
       showExtraRow,
+      extraLeads,
     });
   }, [
     canvasWidth,
@@ -278,6 +284,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
     layout,
     gainMmMv,
     showExtraRow,
+    extraLeads,
     rowsCount,
     rowHeightMm,
   ]);
@@ -311,6 +318,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
       speedMmSec,
       gainMmMv,
       showExtraRow,
+      extraLeads,
       caliperEnabled,
       leadProfiles,
       stageMods,
@@ -333,6 +341,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
     options,
     snapshot,
     showExtraRow,
+    extraLeads,
     rowsCount,
     rowHeightMm,
   ]);
@@ -369,7 +378,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
   };
 
   // Изменение скорости, усиления или раскладки меняет смысл рамки: начинаем измерение заново.
-  useEffect(() => { setCaliper(null); pointerIdRef.current = null; }, [speedMmSec, gainMmMv, layout, showExtraRow, leadProfiles, stageMods, heartRate]);
+  useEffect(() => { setCaliper(null); pointerIdRef.current = null; }, [speedMmSec, gainMmMv, layout, showExtraRow, extraLeads, leadProfiles, stageMods, heartRate]);
 
   const caliperStats = (() => {
     if (!caliper) return null;
@@ -387,21 +396,19 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
     options.qrsPattern,
     options.rhythmDisorder
   );
-  const currentMaxStMm = getMaxStandardStMm(leadProfiles, stageMods);
-  const resolutionPct =
-    snapshot && snapshot.maxStMm >= 1.0
-      ? Math.round(((snapshot.maxStMm - currentMaxStMm) / snapshot.maxStMm) * 100)
-      : null;
+  const recording = useMemo(
+    () => ({ leadProfiles, stageMods, heartRate, options }),
+    [leadProfiles, stageMods, heartRate, options]
+  );
 
   const captureSnapshot = () => {
     setSnapshot({
+      ...recording,
       label: snapshotLabel ?? 'Зафиксированная кривая',
-      leadProfiles,
-      stageMods,
-      heartRate,
-      options,
-      maxStMm: currentMaxStMm,
+      caseId: activeCaseId,
+      comparisonContext,
     });
+    setComparisonLead(getInitialComparisonLead(recording));
   };
 
   const handleExportPng = (mode: 'clean' | 'annotated') => {
@@ -617,42 +624,16 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
       </div>
 
       {snapshot && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-200 bg-sky-50/70 px-3 py-1.5 text-xs dark:border-sky-900/60 dark:bg-sky-950/40">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="flex items-center gap-1.5 font-semibold text-sky-900 dark:text-sky-200">
-              <span className="inline-block w-4 border-t-2 border-dashed border-sky-600 dark:border-sky-400" />
-              Эталон «Было»: {snapshot.label}
-            </span>
-            <span className="font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-              Макс. ST↑: {snapshot.maxStMm.toFixed(1)} → {currentMaxStMm.toFixed(1)} мм
-            </span>
-            {resolutionPct !== null && (
-              <span
-                className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
-                  resolutionPct >= 50
-                    ? 'bg-emerald-600 text-white'
-                    : resolutionPct > 0
-                      ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200'
-                      : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                }`}
-              >
-                {resolutionPct >= 50
-                  ? `Резолюция ST ≥ 50% (−${resolutionPct}%)`
-                  : resolutionPct > 0
-                    ? `Снижение ST на ${resolutionPct}%`
-                    : `Без снижения ST (${resolutionPct}%)`}
-              </span>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setSnapshot(null)}
-            className="no-print flex items-center gap-1 rounded border border-sky-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-sky-800 hover:bg-sky-100 dark:border-sky-700 dark:bg-slate-800 dark:text-sky-200 dark:hover:bg-slate-700"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Сбросить «Было»
-          </button>
-        </div>
+        <EcgStComparison
+          before={snapshot}
+          after={recording}
+          lead={comparisonLead}
+          onChangeLead={setComparisonLead}
+          onReset={() => setSnapshot(null)}
+          sameScenario={snapshot.caseId === activeCaseId && snapshot.comparisonContext === comparisonContext}
+          speedMmSec={speedMmSec}
+          gainMmMv={gainMmMv}
+        />
       )}
 
       <div className="no-print flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 md:hidden dark:border-slate-800 dark:bg-slate-800/80" aria-label="Переход к отведениям">
@@ -660,6 +641,11 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
           <button key={label} className="rounded border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" onClick={() => {
             if (paperViewportRef.current) paperViewportRef.current.scrollLeft = index * 250 / (layout === '3x4' ? 4 : 2) * pxPerMm;
           }}>{label}</button>)}
+        {showExtraRow && <button type="button" className="rounded border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          onClick={() => {
+            if (paperViewportRef.current) paperViewportRef.current.scrollLeft = 0;
+            stageRef.current?.querySelector('[data-extra-leads-start]')?.scrollIntoView({ block: 'center', inline: 'nearest' });
+          }}>Доп. отведения</button>}
       </div>
       <p className="px-3 py-2 text-xs text-slate-600 md:hidden dark:text-slate-400">{caliperEnabled ? 'Проведите пальцем по ЭКГ для измерения. Двумя пальцами меняйте масштаб. Для прокрутки выключите калипер.' : 'Листайте ленту по горизонтали. Разведите или сведите два пальца для изменения масштаба.'}</p>
       <div ref={paperViewportRef} data-ecg-viewport className="relative max-w-full overflow-x-auto bg-slate-100 dark:bg-slate-950/60">
@@ -675,6 +661,31 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
             style={{ width: canvasWidth, height: canvasHeight, touchAction: caliperEnabled ? 'none' : 'pan-x pan-y' }}
             className={`block ${caliperEnabled ? 'cursor-crosshair' : 'cursor-default'}`}
           />
+          {showExtraRow && <span data-extra-leads-start aria-hidden="true" className="pointer-events-none absolute left-0"
+            style={{ top: (12 + rowsCount * rowHeightMm) * pxPerMm }} />}
+
+          {leadMarking && (layout === '3x4' ? GRID_3X4 : GRID_6X2).flatMap((row, rowIndex) =>
+            row.map((id, columnIndex) => {
+              const lead = id as StandardLeadId;
+              const marked = leadMarking.marked.includes(lead);
+              if (!leadMarking.onToggle && !marked) return null;
+              return <button
+                key={lead}
+                type="button"
+                disabled={!leadMarking.onToggle}
+                aria-label={`Отметить отведение ${lead}`}
+                aria-pressed={marked}
+                onClick={() => leadMarking.onToggle?.(lead)}
+                style={{
+                  left: (14 + columnIndex * 250 / row.length) * pxPerMm,
+                  top: (12 + rowIndex * rowHeightMm + rowHeightMm * 0.6 - 15) * pxPerMm,
+                }}
+                className={`absolute z-10 min-h-8 min-w-10 rounded border px-1.5 text-xs font-bold shadow-sm ${marked
+                  ? 'border-sky-800 bg-sky-700 text-white'
+                  : 'border-slate-300 bg-white text-slate-800 hover:border-sky-700'}`}
+              >{lead}</button>;
+            })
+          )}
 
           {caliperEnabled && caliper && (
             <div

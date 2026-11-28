@@ -82,3 +82,43 @@ test('Хранилище восстанавливает ответы и этап
   assert.ok(saveAttempts([a]));
   delete global.localStorage;
 });
+
+test('Второй случай сохраняет отметки, выбор отведений и проекцию КАГ', () => {
+  const scenario = core.POSTERIOR_CLINICAL_CASE;
+  assert.deepEqual(core.validateScenario(scenario), []);
+  let attempt = core.createAttempt(scenario, 'posterior-attempt', now);
+  assert.equal(core.getTrainingView(scenario, attempt).reviewSteps.length, 0);
+  assert.throws(() => core.answerQuestion(scenario, attempt, 'posterior', now));
+  assert.throws(() => core.answerQuestion(scenario, attempt, 'posterior', now, { markedLeads: ['V8'] }));
+  const answerAndAdvance = (choice, evidence) => {
+    attempt = core.answerQuestion(scenario, attempt, choice, now, evidence);
+    attempt = core.advanceAttempt(scenario, attempt, now);
+  };
+  answerAndAdvance('posterior', { markedLeads: ['V1', 'V2'] });
+  answerAndAdvance('right');
+  assert.deepEqual(core.getTrainingView(scenario, attempt).step.extraLeads, ['V7', 'V8', 'V9']);
+  answerAndAdvance('supports');
+  assert.throws(() => core.answerQuestion(scenario, attempt, 'posterior', now, {
+    angiography: { system: 'RCA', laoDeg: 500, cranDeg: 20 },
+  }));
+  const angiography = { system: 'RCA', laoDeg: 35, cranDeg: 20 };
+  answerAndAdvance('posterior', { angiography });
+  const restored = core.restoreAttempt(scenario, JSON.parse(JSON.stringify(attempt)));
+  const view = core.getTrainingView(scenario, restored);
+  assert.equal(view.score, 3);
+  assert.deepEqual(view.results[0].evidence, { markedLeads: ['V1', 'V2'] });
+  assert.deepEqual(view.results[3].evidence, { angiography });
+  assert.deepEqual(view.reviewSteps.map(step => step.kind), ['ecg', 'ecg', 'angiography']);
+
+  const store = new Map();
+  global.localStorage = { getItem: key => store.get(key), setItem: (key, value) => store.set(key, value) };
+  try {
+    const first = fresh();
+    assert.equal(saveAttempts([first]), null);
+    assert.equal(saveAttempts([restored], scenario.id), null);
+    assert.deepEqual(loadAttempts(s).attempts, [first]);
+    assert.deepEqual(loadAttempts(scenario).attempts, [restored]);
+  } finally {
+    delete global.localStorage;
+  }
+});
