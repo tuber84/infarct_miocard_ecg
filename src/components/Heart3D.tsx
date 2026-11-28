@@ -390,93 +390,13 @@ function setupArteryMesh(mesh: THREE.Mesh, meshName: string, dominance: Dominanc
   return { dists, retroDists, inLcaFlags };
 }
 
-const VERTEBRA_Y_POSITIONS = [-1.55, -1.1, -0.65, -0.2, 0.25, 0.7, 1.15, 1.6];
-
-const FluoroscopyLandmarks: React.FC = React.memo(() => {
-  const lungGeometry = useMemo(() => {
-    const profile = [
-      new THREE.Vector2(0.0, -1.02),
-      new THREE.Vector2(0.42, -1.06),
-      new THREE.Vector2(0.92, -1.15),
-      new THREE.Vector2(0.96, -0.55),
-      new THREE.Vector2(0.86, 0.2),
-      new THREE.Vector2(0.62, 0.85),
-      new THREE.Vector2(0.34, 1.2),
-      new THREE.Vector2(0.0, 1.35),
-    ];
-    return new THREE.LatheGeometry(profile, 24);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      lungGeometry.dispose();
-    };
-  }, [lungGeometry]);
-
-  return (
-    <group>
-      {/* Рентгеновский силуэт правого и левого лёгочного поля (светлые воздушные поля позади реберной дуги) */}
-      <mesh
-        geometry={lungGeometry}
-        position={[-1.48, 0.12, -0.35]}
-        scale={[0.88, 1.0, 0.82]}
-        renderOrder={-1}
-      >
-        <meshStandardMaterial
-          color="#f4f8fc"
-          roughness={0.95}
-          metalness={0}
-          transparent
-          opacity={0.34}
-          depthWrite={false}
-        />
-      </mesh>
-      <mesh
-        geometry={lungGeometry}
-        position={[1.55, 0.08, -0.35]}
-        scale={[0.8, 1.04, 0.8]}
-        renderOrder={-1}
-      >
-        <meshStandardMaterial
-          color="#f4f8fc"
-          roughness={0.95}
-          metalness={0}
-          transparent
-          opacity={0.34}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Рентгеновский силуэт грудного отдела позвоночника (сзади по центру, z < 0) */}
-      <group position={[-0.05, 0, -1.65]}>
-        {VERTEBRA_Y_POSITIONS.map((vy) => (
-          <group key={vy} position={[0, vy, 0]}>
-            <mesh renderOrder={0}>
-              <cylinderGeometry args={[0.3, 0.3, 0.34, 14]} />
-              <meshBasicMaterial color="#475569" transparent opacity={0.13} depthWrite={false} />
-            </mesh>
-            <mesh position={[0, -0.04, -0.34]} renderOrder={0}>
-              <boxGeometry args={[0.09, 0.22, 0.26]} />
-              <meshBasicMaterial color="#334155" transparent opacity={0.11} depthWrite={false} />
-            </mesh>
-          </group>
-        ))}
-      </group>
-
-      {/* Силуэт правого/центрального купола диафрагмы под нижней стенкой сердца */}
-      <mesh position={[-0.22, -2.28, -0.15]} scale={[1.05, 0.36, 0.85]} renderOrder={0}>
-        <sphereGeometry args={[2.5, 28, 12, 0, Math.PI * 2, 0, Math.PI * 0.36]} />
-        <meshBasicMaterial
-          color="#64748b"
-          transparent
-          opacity={0.12}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-    </group>
-  );
-});
+/**
+ * Смещение оси позвоночника в сырых координатах (.tools/spine/spine.glb).
+ * В файле позвоночник смоделирован с центром тел X ≈ 0.328, а сагиттальная плоскость лёгких — X = 0.019.
+ * Дельта -0.309 совмещает позвоночный столб с сагиттальной плоскостью тела и лёгких (X = 0),
+ * обеспечивая каноническую рентген-анатомическую проекцию: 2/3 тени сердца слева от позвоночника, 1/3 справа.
+ */
+const SPINE_SAGITTAL_DELTA_X = -0.309;
 
 function computeLandmarksForDominance(
   dominance: Dominance,
@@ -549,6 +469,7 @@ function HeartSceneContent({
   onLoaded,
 }: HeartSceneProps) {
   const [modelGroup, setModelGroup] = useState<THREE.Group | null>(null);
+  const [fluoroGroup, setFluoroGroup] = useState<THREE.Group | null>(null);
   const [landmarksByDominance, setLandmarksByDominance] = useState<Record<Dominance, LandmarkWorldPos[]>>({
     right: [],
     left: [],
@@ -581,10 +502,11 @@ function HeartSceneContent({
   const bolusProgressRef = useRef<number>(2.1);
   const bolusAnimatingRef = useRef<boolean>(false);
 
-  // Загрузка обоих сегментированных GLB (правый + левый типы) строго 1 раз + полный dispose при размонтировании
+  // Загрузка сегментированных моделей сердца и ориентиров флюороскопии строго 1 раз
   useEffect(() => {
     let cancelled = false;
     let loadedWrapper: THREE.Group | null = null;
+    let loadedFluoro: THREE.Group | null = null;
 
     const assetBase = import.meta.env.BASE_URL;
     const loader = new GLTFLoader();
@@ -592,14 +514,24 @@ function HeartSceneContent({
     Promise.all([
       loader.loadAsync(`${assetBase}models/heart/heart_segmented.glb`),
       loader.loadAsync(`${assetBase}models/heart/heart_artery_left_type.glb`),
+      loader.loadAsync(`${assetBase}models/heart/spine.glb`).catch((err) => {
+        console.warn('Не удалось загрузить spine.glb:', err);
+        return null;
+      }),
+      loader.loadAsync(`${assetBase}models/heart/lungs.glb`).catch((err) => {
+        console.warn('Не удалось загрузить lungs.glb:', err);
+        return null;
+      }),
     ])
-      .then(([rightGltf, leftGltf]) => {
+      .then(([rightGltf, leftGltf, spineGltf, lungsGltf]) => {
         const rightScene = rightGltf.scene;
         const leftScene = leftGltf.scene;
 
         if (cancelled) {
           disposeSceneResources(rightScene);
           disposeSceneResources(leftScene);
+          if (spineGltf?.scene) disposeSceneResources(spineGltf.scene);
+          if (lungsGltf?.scene) disposeSceneResources(lungsGltf.scene);
           return;
         }
 
@@ -682,10 +614,88 @@ function HeartSceneContent({
         }
         wrapper.updateMatrixWorld(true);
 
+        // Настройка ориентиров флюороскопии (детальные анатомические позвоночник и лёгкие)
+        const fluoro = new THREE.Group();
+
+        if (spineGltf?.scene) {
+          const spineScene = spineGltf.scene;
+          spineScene.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              const mesh = child as THREE.Mesh;
+              const importedMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              importedMaterials.forEach((material) => material.dispose());
+              mesh.material = new THREE.MeshStandardMaterial({
+                color: '#475569',
+                roughness: 0.82,
+                metalness: 0.08,
+                transparent: true,
+                opacity: 0.24,
+                depthWrite: false,
+              });
+              mesh.renderOrder = -1;
+            }
+          });
+
+          spineScene.scale.setScalar(normScale);
+          spineScene.position.set(
+            (-center.x + SPINE_SAGITTAL_DELTA_X) * normScale,
+            -center.y * normScale,
+            -center.z * normScale
+          );
+          fluoro.add(spineScene);
+        }
+
+        if (lungsGltf?.scene) {
+          const lungsScene = lungsGltf.scene;
+          lungsScene.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              const mesh = child as THREE.Mesh;
+              const importedMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              importedMaterials.forEach((material) => material.dispose());
+              mesh.material = new THREE.MeshStandardMaterial({
+                color: '#f8fafc',
+                roughness: 0.95,
+                metalness: 0.0,
+                transparent: true,
+                opacity: 0.10,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+              });
+              mesh.renderOrder = -2;
+            }
+          });
+
+          lungsScene.scale.setScalar(normScale);
+          lungsScene.position.set(
+            -center.x * normScale,
+            -center.y * normScale,
+            -center.z * normScale
+          );
+          fluoro.add(lungsScene);
+        }
+
+        // Силуэт правого/центрального купола диафрагмы под нижней стенкой сердца и основанием лёгких
+        const diaphragmGeom = new THREE.SphereGeometry(2.5, 28, 12, 0, Math.PI * 2, 0, Math.PI * 0.36);
+        const diaphragmMat = new THREE.MeshBasicMaterial({
+          color: '#64748b',
+          transparent: true,
+          opacity: 0.12,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        const diaphragmMesh = new THREE.Mesh(diaphragmGeom, diaphragmMat);
+        diaphragmMesh.position.set(-0.22, -2.28, -0.15);
+        diaphragmMesh.scale.set(1.05, 0.36, 0.85);
+        diaphragmMesh.renderOrder = -1;
+        fluoro.add(diaphragmMesh);
+
+        fluoro.updateMatrixWorld(true);
+
         const rightLandmarks = computeLandmarksForDominance('right', rightMeshes);
         const leftLandmarks = computeLandmarksForDominance('left', leftMeshes);
 
         loadedWrapper = wrapper;
+        loadedFluoro = fluoro;
         bodyMeshRef.current = bodyMesh;
         arteryMeshesByDominanceRef.current = { right: rightMeshes, left: leftMeshes };
         arteryDistByDominanceRef.current = { right: rightDists, left: leftDists };
@@ -694,6 +704,7 @@ function HeartSceneContent({
 
         setLandmarksByDominance({ right: rightLandmarks, left: leftLandmarks });
         setModelGroup(wrapper);
+        setFluoroGroup(fluoro);
         onLoadedRef.current();
       })
       .catch((err) => {
@@ -704,6 +715,9 @@ function HeartSceneContent({
       cancelled = true;
       if (loadedWrapper) {
         disposeSceneResources(loadedWrapper);
+      }
+      if (loadedFluoro) {
+        disposeSceneResources(loadedFluoro);
       }
     };
   }, []);
@@ -918,7 +932,9 @@ function HeartSceneContent({
     <group>
       <primitive object={modelGroup} />
 
-      {viewMode === 'angio' && showFluoroLandmarks && <FluoroscopyLandmarks />}
+      {viewMode === 'angio' && showFluoroLandmarks && fluoroGroup && (
+        <primitive object={fluoroGroup} />
+      )}
 
       {activeLandmarks.map((lm) => {
         const isActive = lm.caseId === activeCaseId;
