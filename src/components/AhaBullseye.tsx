@@ -11,6 +11,7 @@ interface AhaBullseyeProps {
   timeline: number;
   activeCaseId: CaseId;
   lesionType?: LesionType;
+  isDark?: boolean;
 }
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -83,6 +84,7 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
   timeline,
   activeCaseId,
   lesionType = 'occlusion',
+  isDark = false,
 }) => {
   const [hoveredText, setHoveredText] = useState<string | null>(null);
   const [selectedText, setSelectedText] = useState<string | null>(null);
@@ -118,9 +120,9 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
       return '#94a3b8'; // Рубец
     }
     if (reciprocalSet.has(segId)) {
-      return '#dbeafe';
+      return isDark ? '#1e3a8a' : '#dbeafe';
     }
-    return '#f8fafc';
+    return isDark ? '#1e293b' : '#f8fafc';
   };
 
   const getSegmentTextFill = (segId: number) => {
@@ -136,8 +138,8 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
       if (timeline >= 0.78) return '#0f172a';
       return '#ffffff';
     }
-    if (reciprocalSet.has(segId)) return '#1e40af';
-    return '#475569';
+    if (reciprocalSet.has(segId)) return isDark ? '#bfdbfe' : '#1e40af';
+    return isDark ? '#cbd5e1' : '#475569';
   };
 
   const rvFill = rvInvolved
@@ -146,15 +148,17 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
       : timeline >= 0.78
         ? '#94a3b8'
         : '#dc2626'
-    : '#f1f5f9';
+    : isDark
+      ? '#1e293b'
+      : '#f1f5f9';
 
   return (
-    <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
           Сегменты ЛЖ (AHA 17) + ПЖ
         </span>
-        <span className="text-[10.5px] font-medium text-slate-500">
+        <span className="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">
           {dominance === 'right' ? 'Правый тип' : 'Левый тип'}
         </span>
       </div>
@@ -164,7 +168,7 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
         <path
           d="M 52 38 C 12 65, 12 159, 52 186 C 36 150, 36 74, 52 38 Z"
           fill={rvFill}
-          stroke={rvInvolved ? '#991b1b' : '#cbd5e1'}
+          stroke={rvInvolved ? '#991b1b' : isDark ? '#475569' : '#cbd5e1'}
           strokeWidth="1.5"
           className="cursor-pointer transition-colors"
           onClick={() => toggleSelected('Правый желудочек (ПЖ)')}
@@ -177,7 +181,7 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
           textAnchor="middle"
           fontSize="10"
           fontWeight="700"
-          fill={rvInvolved && !reperfused && timeline < 0.78 ? '#ffffff' : '#475569'}
+          fill={rvInvolved && !reperfused && timeline < 0.78 ? '#ffffff' : isDark ? '#cbd5e1' : '#475569'}
           pointerEvents="none"
         >
           ПЖ
@@ -201,7 +205,7 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
               <path
                 d={describeRingSector(cx, cy, sec.rIn, sec.rOut, sec.startDeg, sec.endDeg)}
                 fill={getSegmentFill(sec.id)}
-                stroke={isRecip ? '#2563eb' : '#cbd5e1'}
+                stroke={isRecip ? (isDark ? '#60a5fa' : '#2563eb') : isDark ? '#475569' : '#cbd5e1'}
                 strokeWidth={isRecip ? '1.6' : '1.1'}
                 className="transition-colors"
               />
@@ -232,7 +236,7 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
             cy={cy}
             r={18}
             fill={getSegmentFill(17)}
-            stroke="#cbd5e1"
+            stroke={isDark ? '#475569' : '#cbd5e1'}
             strokeWidth="1.2"
             className="transition-colors"
           />
@@ -250,7 +254,13 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
         </g>
 
         {/* Пунктирные границы коронарных бассейнов (зависит от правого/левого типа) */}
-        <g stroke="#334155" strokeWidth="1.2" strokeDasharray="3 2" opacity="0.55" pointerEvents="none">
+        <g
+          stroke={isDark ? '#94a3b8' : '#334155'}
+          strokeWidth="1.2"
+          strokeDasharray="3 2"
+          opacity={isDark ? '0.65' : '0.55'}
+          pointerEvents="none"
+        >
           {/* Граница ПМЖВ / ОВ (верх-право) */}
           <line x1={cx} y1={cy} x2={cx + 85} y2={cy - 49} />
           {/* Нижне-перегородочная граница ПМЖВ с ПКА (правый тип) или с доминантной ОВ (левый тип) */}
@@ -262,23 +272,23 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
         </g>
 
         {/* Подписи сторон света */}
-        <text x={cx} y="10" textAnchor="middle" fontSize="9.5" fontWeight="600" fill="#64748b">
+        <text x={cx} y="10" textAnchor="middle" fontSize="9.5" fontWeight="600" fill={isDark ? '#94a3b8' : '#64748b'}>
           Передняя (ПМЖВ)
         </text>
-        <text x={cx} y="220" textAnchor="middle" fontSize="9.5" fontWeight="600" fill="#64748b">
+        <text x={cx} y="220" textAnchor="middle" fontSize="9.5" fontWeight="600" fill={isDark ? '#94a3b8' : '#64748b'}>
           Нижняя ({dominance === 'right' ? 'ПКА' : 'ОВ'})
         </text>
-        <text x="255" y={cy + 3} textAnchor="end" fontSize="9" fontWeight="600" fill="#64748b">
+        <text x="255" y={cy + 3} textAnchor="end" fontSize="9" fontWeight="600" fill={isDark ? '#94a3b8' : '#64748b'}>
           Бок. (ОВ)
         </text>
       </svg>
 
       {/* Легенда + подсказка при наведении / нажатии */}
-      <div className="mt-1.5 flex min-h-[20px] items-center justify-between gap-2 border-t border-slate-100 pt-1.5 text-[10.5px]">
+      <div className="mt-1.5 flex min-h-[20px] items-center justify-between gap-2 border-t border-slate-100 pt-1.5 text-[10.5px] dark:border-slate-800">
         {activeText ? (
-          <span className="truncate font-semibold text-slate-800">{activeText}</span>
+          <span className="truncate font-semibold text-slate-800 dark:text-slate-100">{activeText}</span>
         ) : (
-          <div className="flex flex-wrap items-center gap-2.5 text-slate-600">
+          <div className="flex flex-wrap items-center gap-2.5 text-slate-600 dark:text-slate-300">
             <span className="flex items-center gap-1">
               <span
                 className={`inline-block h-2.5 w-2.5 rounded-sm ${
@@ -293,7 +303,7 @@ const AhaBullseyeComponent: React.FC<AhaBullseyeProps> = ({
             </span>
             {!isTakotsubo && (
               <span className="flex items-center gap-1">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm border border-blue-600 bg-blue-100" />
+                <span className="inline-block h-2.5 w-2.5 rounded-sm border border-blue-600 bg-blue-100 dark:border-blue-400 dark:bg-blue-900" />
                 Реципрокн.
               </span>
             )}

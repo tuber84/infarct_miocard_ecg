@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import { TrainingPanel, type TrainingSubPanel } from './components/TrainingPanel';
 import { CaseId } from './core/types';
 import {
@@ -6,6 +7,7 @@ import {
   isStandalonePwa,
   preferTrainingHome,
 } from './platform/runtime';
+import { applyTheme, readInitialTheme, type ThemeMode } from './platform/theme';
 
 const AtlasView = lazy(() => import('./components/AtlasView'));
 const IOS_INSTALL_DISMISSED_KEY = 'cardioatlas.iosInstallDismissed.v1';
@@ -23,6 +25,7 @@ export default function App() {
   );
   const [atlasCase, setAtlasCase] = useState<CaseId>('lad_prox');
   const [trainingPanel, setTrainingPanel] = useState<TrainingSubPanel>('patient');
+  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme);
   const [showIosInstallHint, setShowIosInstallHint] = useState<boolean>(() => {
     if (!isIosSafari || isStandalonePwa || typeof window === 'undefined') return false;
     try {
@@ -41,6 +44,14 @@ export default function App() {
     } catch {
       // Игнорируем отказ хранилища: скрываем подсказку до конца текущей сессии.
     }
+  }, []);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   }, []);
 
   useEffect(() => {
@@ -113,24 +124,55 @@ export default function App() {
 
   return (
     <>
-      <nav aria-label="Режим приложения" className="safe-top safe-x flex gap-2 border-b bg-white pb-2">
+      <nav
+        aria-label="Режим приложения"
+        className="safe-top safe-x flex items-center gap-2 border-b border-slate-200 bg-white pb-2 transition-colors dark:border-slate-800 dark:bg-slate-900"
+      >
         <button
           onClick={() => navigateToMode('atlas')}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold ${mode === 'atlas' ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            mode === 'atlas'
+              ? 'bg-red-700 text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+          }`}
         >
           Атлас
         </button>
         <button
           onClick={() => navigateToMode('training')}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold ${mode === 'training' ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            mode === 'training'
+              ? 'bg-red-700 text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+          }`}
         >
           Тренировка
+        </button>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label="Переключить тему"
+          aria-pressed={theme === 'dark'}
+          title={theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+        >
+          {theme === 'dark' ? (
+            <>
+              <Sun className="h-4 w-4 text-amber-400" />
+              <span className="hidden sm:inline">Светлая</span>
+            </>
+          ) : (
+            <>
+              <Moon className="h-4 w-4 text-slate-600" />
+              <span className="hidden sm:inline">Тёмная</span>
+            </>
+          )}
         </button>
       </nav>
       {showIosInstallHint && (
         <div
           role="note"
-          className="safe-x flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 py-2 text-xs text-amber-950"
+          className="safe-x flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 py-2 text-xs text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200"
         >
           <span>
             Для офлайн-работы на iPhone: нажмите «Поделиться» → «На экран Домой».
@@ -138,7 +180,7 @@ export default function App() {
           <button
             type="button"
             onClick={dismissIosInstallHint}
-            className="shrink-0 rounded-md border border-amber-300 bg-white px-2.5 py-1 font-semibold text-amber-900"
+            className="shrink-0 rounded-md border border-amber-300 bg-white px-2.5 py-1 font-semibold text-amber-900 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200"
           >
             Понятно
           </button>
@@ -154,12 +196,12 @@ export default function App() {
         ) : (
           <Suspense
             fallback={
-              <div className="flex min-h-[240px] items-center justify-center p-6 text-sm text-slate-500">
+              <div className="flex min-h-[240px] items-center justify-center p-6 text-sm text-slate-500 dark:text-slate-400">
                 Загрузка атласа и 3D-модели…
               </div>
             }
           >
-            <AtlasView key={atlasCase} initialCaseId={atlasCase} />
+            <AtlasView key={atlasCase} initialCaseId={atlasCase} isDark={theme === 'dark'} />
           </Suspense>
         )}
       </div>

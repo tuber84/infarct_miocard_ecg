@@ -89,32 +89,32 @@ const LeadCard: React.FC<LeadCardProps> = React.memo(({
 
   const cardBorder =
     effectiveHighlight === 'ste'
-      ? 'border-red-500 bg-red-50/75 ring-1 ring-red-400/50'
+      ? 'border-red-500 bg-red-50/75 ring-1 ring-red-400/50 dark:border-red-500/70 dark:bg-red-950/35 dark:ring-red-500/30'
       : effectiveHighlight === 'std'
-        ? 'border-blue-500 bg-blue-50/75 ring-1 ring-blue-400/50'
+        ? 'border-blue-500 bg-blue-50/75 ring-1 ring-blue-400/50 dark:border-blue-500/70 dark:bg-blue-950/35 dark:ring-blue-500/30'
         : effectiveHighlight === 'tinv' || (!manualMode && badge.tone === 'inv')
-          ? 'border-violet-400 bg-violet-50/70 ring-1 ring-violet-300/60'
+          ? 'border-violet-400 bg-violet-50/70 ring-1 ring-violet-300/60 dark:border-violet-500/70 dark:bg-violet-950/35 dark:ring-violet-500/30'
           : !manualMode && badge.tone === 'hyper'
-            ? 'border-amber-400 bg-amber-50/60 ring-1 ring-amber-300/60'
+            ? 'border-amber-400 bg-amber-50/60 ring-1 ring-amber-300/60 dark:border-amber-500/70 dark:bg-amber-950/35 dark:ring-amber-500/30'
             : isRecommendedExtra
-              ? 'border-amber-300 bg-amber-50/30 hover:border-amber-400'
-              : 'border-slate-200 bg-white hover:border-slate-300';
+              ? 'border-amber-300 bg-amber-50/30 hover:border-amber-400 dark:border-amber-700/70 dark:bg-amber-950/20 dark:hover:border-amber-500'
+              : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/60 dark:hover:border-slate-600';
 
   const pathD = useMemo(
     () => buildMiniLeadPath(lead, profile, stageMods, qrsPattern),
     [lead, profile, stageMods, qrsPattern]
   );
 
-  const strokeColor =
+  const strokeClass =
     effectiveHighlight === 'ste'
-      ? '#dc2626'
+      ? 'stroke-red-600 dark:stroke-red-400'
       : effectiveHighlight === 'std'
-        ? '#2563eb'
+        ? 'stroke-blue-600 dark:stroke-blue-400'
         : effectiveHighlight === 'tinv' || (!manualMode && badge.tone === 'inv')
-          ? '#7c3aed'
+          ? 'stroke-violet-600 dark:stroke-violet-400'
           : !manualMode && badge.tone === 'hyper'
-            ? '#d97706'
-            : '#475569';
+            ? 'stroke-amber-600 dark:stroke-amber-400'
+            : 'stroke-slate-600 dark:stroke-slate-300';
 
   return (
     <button
@@ -124,7 +124,7 @@ const LeadCard: React.FC<LeadCardProps> = React.memo(({
       className={`group flex flex-col justify-between rounded-lg border px-2 py-1.5 text-left transition-all ${cardBorder}`}
     >
       <div className="flex w-full items-center justify-between gap-1">
-        <span className="text-xs font-bold text-slate-900">{lead}</span>
+        <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{lead}</span>
         {manualMode ? (
           manualState !== 'normal' ? (
             <span
@@ -139,7 +139,7 @@ const LeadCard: React.FC<LeadCardProps> = React.memo(({
               {manualState === 'ste' ? 'ST↑' : manualState === 'std' ? 'ST↓' : 'T↓'}
             </span>
           ) : (
-            <span className="text-[10px] text-slate-400">не оценено</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500">не оценено</span>
           )
         ) : badge.text ? (
           <span
@@ -156,7 +156,7 @@ const LeadCard: React.FC<LeadCardProps> = React.memo(({
             {badge.text}
           </span>
         ) : (
-          <span className="truncate text-[9.5px] text-slate-400">
+          <span className="truncate text-[9.5px] text-slate-400 dark:text-slate-500">
             {LEAD_ANATOMY_LABEL[lead]}
           </span>
         )}
@@ -168,14 +168,14 @@ const LeadCard: React.FC<LeadCardProps> = React.memo(({
           y1="17"
           x2="92"
           y2="17"
-          stroke="#cbd5e1"
           strokeWidth="0.7"
           strokeDasharray="2 2"
+          className="stroke-slate-300 dark:stroke-slate-700"
         />
-        <path d={pathD} fill="none" stroke={strokeColor} strokeWidth="1.5" />
+        <path d={pathD} fill="none" strokeWidth="1.5" className={strokeClass} />
       </svg>
 
-      <div className="flex w-full items-center justify-between text-[9.5px] text-slate-500">
+      <div className="flex w-full items-center justify-between text-[9.5px] text-slate-500 dark:text-slate-400">
         <span className="truncate">{LEAD_ANATOMY_LABEL[lead]}</span>
       </div>
     </button>
@@ -216,23 +216,23 @@ const LeadCardsPanelComponent: React.FC<LeadCardsPanelProps> = ({
   );
 
   return (
-    <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+    <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 dark:border-slate-800">
         <div>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
             Отведения и карта ЭКГ
           </h2>
-          <p className="text-[10.5px] text-slate-500">
-            1 = <span className="font-semibold text-red-600">ST↑</span>, 2 ={' '}
-            <span className="font-semibold text-blue-600">ST↓</span>, 3 ={' '}
-            <span className="font-semibold text-violet-600">T↓</span>, 4 = сброс
+          <p className="text-[10.5px] text-slate-500 dark:text-slate-400">
+            1 = <span className="font-semibold text-red-600 dark:text-red-400">ST↑</span>, 2 ={' '}
+            <span className="font-semibold text-blue-600 dark:text-blue-400">ST↓</span>, 3 ={' '}
+            <span className="font-semibold text-violet-600 dark:text-violet-400">T↓</span>, 4 = сброс
           </p>
         </div>
         {manualMode && (
           <button
             type="button"
             onClick={onResetManual}
-            className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+            className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             <RotateCcw className="h-3 w-3" />
             Сброс
@@ -243,29 +243,29 @@ const LeadCardsPanelComponent: React.FC<LeadCardsPanelProps> = ({
       <div className="flex-1 overflow-y-auto p-2.5">
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Конечности
             </div>
             <div className="flex flex-col gap-1.5">{LIMB_LEADS.map(renderLeadCard)}</div>
           </div>
           <div>
-            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Грудные
             </div>
             <div className="flex flex-col gap-1.5">{CHEST_LEADS.map(renderLeadCard)}</div>
           </div>
         </div>
 
-        <div className="mt-2.5 border-t border-slate-100 pt-2">
+        <div className="mt-2.5 border-t border-slate-100 pt-2 dark:border-slate-800">
           <button
             type="button"
             onClick={() => setShowExtra((s) => !s)}
-            className="flex w-full items-center justify-between rounded-md bg-slate-50 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+            className="flex w-full items-center justify-between rounded-md bg-slate-50 px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             <span className="flex items-center gap-1.5">
               Доп. отведения (V3R–V4R, V7–V9)
               {recommendedExtraLeads.length > 0 && (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-bold text-amber-800">
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-bold text-amber-800 dark:bg-amber-950/70 dark:text-amber-300">
                   Рекомендованы
                 </span>
               )}

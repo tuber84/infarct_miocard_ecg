@@ -399,19 +399,19 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
   };
 
   return (
-    <div className="ecg-paper min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
+    <div className="ecg-paper min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
+      <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
             Симуляция 12 отведений
           </span>
 
-          <div className="flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-[11px]">
+          <div className="flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-[11px] dark:border-slate-700 dark:bg-slate-800">
             <button
               type="button"
               onClick={() => setLayout('3x4')}
               className={`rounded px-2 py-0.5 font-semibold ${
-                layout === '3x4' ? 'bg-red-700 text-white' : 'text-slate-600'
+                layout === '3x4' ? 'bg-red-700 text-white' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
               3×4 + ритм
@@ -420,19 +420,19 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
               type="button"
               onClick={() => setLayout('6x2')}
               className={`rounded px-2 py-0.5 font-semibold ${
-                layout === '6x2' ? 'bg-red-700 text-white' : 'text-slate-600'
+                layout === '6x2' ? 'bg-red-700 text-white' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
               6×2
             </button>
           </div>
 
-          <div className="flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-[11px]">
+          <div className="flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-[11px] dark:border-slate-700 dark:bg-slate-800">
             <button
               type="button"
               onClick={() => setGainMmMv(10)}
               className={`rounded px-2 py-0.5 font-semibold ${
-                gainMmMv === 10 ? 'bg-red-700 text-white' : 'text-slate-600'
+                gainMmMv === 10 ? 'bg-red-700 text-white' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
               10 мм/мВ
@@ -441,19 +441,19 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
               type="button"
               onClick={() => setGainMmMv(5)}
               className={`rounded px-2 py-0.5 font-semibold ${
-                gainMmMv === 5 ? 'bg-red-700 text-white' : 'text-slate-600'
+                gainMmMv === 5 ? 'bg-red-700 text-white' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
               5 мм/мВ
             </button>
           </div>
 
-          <div className="flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-[11px]">
+          <div className="flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-[11px] dark:border-slate-700 dark:bg-slate-800">
             <button
               type="button"
               onClick={() => setSpeedMmSec(25)}
               className={`rounded px-2 py-0.5 font-semibold ${
-                speedMmSec === 25 ? 'bg-red-700 text-white' : 'text-slate-600'
+                speedMmSec === 25 ? 'bg-red-700 text-white' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
               25 мм/с
@@ -462,7 +462,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
               type="button"
               onClick={() => setSpeedMmSec(50)}
               className={`rounded px-2 py-0.5 font-semibold ${
-                speedMmSec === 50 ? 'bg-red-700 text-white' : 'text-slate-600'
+                speedMmSec === 50 ? 'bg-red-700 text-white' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
               50 мм/с
@@ -476,8 +476,8 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
             onClick={onToggleExtraRow}
             className={`rounded-md border px-2 py-1 font-semibold transition ${
               showExtraRow
-                ? 'border-amber-400 bg-amber-50 text-amber-800'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                ? 'border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-600 dark:bg-amber-950/60 dark:text-amber-200'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
             }`}
           >
             + V3R/V4R, V7–V9
@@ -488,8 +488,8 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
             onClick={onToggleArtifacts}
             className={`flex items-center gap-1 rounded-md border px-2 py-1 font-semibold transition ${
               options.artifacts
-                ? 'border-slate-500 bg-slate-700 text-white'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                ? 'border-slate-500 bg-slate-700 text-white dark:bg-slate-600'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
             }`}
           >
             <Sparkles className="h-3 w-3" />
@@ -507,7 +507,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
             className={`flex items-center gap-1 rounded-md border px-2 py-1 font-semibold transition ${
               caliperEnabled
                 ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
             }`}
           >
             <Ruler className="h-3 w-3" />
@@ -522,8 +522,8 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
                 title="Зафиксировать текущую кривую как синий пунктирный контур «Было» для сравнения динамики"
                 className={`flex items-center gap-1 rounded-md border px-2 py-1 font-semibold transition ${
                   snapshot
-                    ? 'border-sky-500 bg-sky-50 text-sky-800'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'border-sky-500 bg-sky-50 text-sky-800 dark:border-sky-600 dark:bg-sky-950/60 dark:text-sky-200'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 <GitCompare className="h-3 w-3" />
@@ -534,7 +534,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
                 type="button"
                 onClick={() => handleExportPng('clean')}
                 title="Скачать PNG-плёнку высокого разрешения без диагноза (раздатка для обучения)"
-                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50"
+                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 <Download className="h-3 w-3" />
                 PNG (чистая)
@@ -544,7 +544,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
                 type="button"
                 onClick={() => handleExportPng('annotated')}
                 title="Скачать PNG-плёнку с названием сценария, артерией и критериями ЭКГ"
-                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50"
+                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 <Download className="h-3 w-3" />
                 PNG (разбор)
@@ -554,7 +554,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
                 type="button"
                 onClick={() => window.print()}
                 title="Распечатать ленту на лист А4 (альбомная ориентация)"
-                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50"
+                className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 <Printer className="h-3 w-3" />
                 Печать
@@ -562,11 +562,11 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
             </>
           )}
 
-          <div className="flex items-center rounded-md border border-slate-200 bg-white px-1">
+          <div className="flex items-center rounded-md border border-slate-200 bg-white px-1 dark:border-slate-700 dark:bg-slate-800">
             <button
               type="button"
               onClick={() => setZoom((z) => Math.max(0.75, +(z - 0.15).toFixed(2)))}
-              className="p-1 text-slate-600 hover:text-slate-900"
+              className="p-1 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
               title="Уменьшить"
             >
               <ZoomOut className="h-3.5 w-3.5" />
@@ -574,14 +574,14 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
             <button
               type="button"
               onClick={() => setZoom(1)}
-              className="px-1.5 font-mono text-[11px] font-semibold text-slate-700"
+              className="px-1.5 font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-200"
             >
               {Math.round(zoom * 100)}%
             </button>
             <button
               type="button"
               onClick={() => setZoom((z) => Math.min(1.6, +(z + 0.15).toFixed(2)))}
-              className="p-1 text-slate-600 hover:text-slate-900"
+              className="p-1 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
               title="Увеличить"
             >
               <ZoomIn className="h-3.5 w-3.5" />
@@ -591,13 +591,13 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
       </div>
 
       {snapshot && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-200 bg-sky-50/70 px-3 py-1.5 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-200 bg-sky-50/70 px-3 py-1.5 text-xs dark:border-sky-900/60 dark:bg-sky-950/40">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="flex items-center gap-1.5 font-semibold text-sky-900">
-              <span className="inline-block w-4 border-t-2 border-dashed border-sky-600" />
+            <span className="flex items-center gap-1.5 font-semibold text-sky-900 dark:text-sky-200">
+              <span className="inline-block w-4 border-t-2 border-dashed border-sky-600 dark:border-sky-400" />
               Эталон «Было»: {snapshot.label}
             </span>
-            <span className="font-mono text-[11px] font-semibold text-slate-700">
+            <span className="font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-300">
               Макс. ST↑: {snapshot.maxStMm.toFixed(1)} → {currentMaxStMm.toFixed(1)} мм
             </span>
             {resolutionPct !== null && (
@@ -606,8 +606,8 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
                   resolutionPct >= 50
                     ? 'bg-emerald-600 text-white'
                     : resolutionPct > 0
-                      ? 'bg-amber-100 text-amber-900'
-                      : 'bg-slate-200 text-slate-700'
+                      ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200'
+                      : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                 }`}
               >
                 {resolutionPct >= 50
@@ -621,7 +621,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
           <button
             type="button"
             onClick={() => setSnapshot(null)}
-            className="no-print flex items-center gap-1 rounded border border-sky-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-sky-800 hover:bg-sky-100"
+            className="no-print flex items-center gap-1 rounded border border-sky-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-sky-800 hover:bg-sky-100 dark:border-sky-700 dark:bg-slate-800 dark:text-sky-200 dark:hover:bg-slate-700"
           >
             <RotateCcw className="h-3 w-3" />
             Сбросить «Было»
@@ -629,13 +629,13 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
         </div>
       )}
 
-      <div className="no-print flex flex-wrap gap-2 border-b bg-slate-50 px-3 py-2 md:hidden" aria-label="Переход к отведениям">
+      <div className="no-print flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 md:hidden dark:border-slate-800 dark:bg-slate-800/80" aria-label="Переход к отведениям">
         {(layout === '3x4' ? ['I–III', 'aVR–aVF', 'V1–V3', 'V4–V6'] : ['I–aVF', 'V1–V6']).map((label, index) =>
-          <button key={label} className="rounded border bg-white px-3 py-2 text-xs font-semibold" onClick={() => {
+          <button key={label} className="rounded border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" onClick={() => {
             if (paperViewportRef.current) paperViewportRef.current.scrollLeft = index * 250 / (layout === '3x4' ? 4 : 2) * pxPerMm;
           }}>{label}</button>)}
       </div>
-      <p className="px-3 py-2 text-xs text-slate-600 md:hidden">{caliperEnabled ? 'Проведите пальцем по ЭКГ для измерения. Двумя пальцами меняйте масштаб. Для прокрутки выключите калипер.' : 'Листайте ленту по горизонтали. Разведите или сведите два пальца для изменения масштаба.'}</p>
+      <p className="px-3 py-2 text-xs text-slate-600 md:hidden dark:text-slate-400">{caliperEnabled ? 'Проведите пальцем по ЭКГ для измерения. Двумя пальцами меняйте масштаб. Для прокрутки выключите калипер.' : 'Листайте ленту по горизонтали. Разведите или сведите два пальца для изменения масштаба.'}</p>
       <div ref={paperViewportRef} data-ecg-viewport className="relative max-w-full overflow-x-auto bg-[#fff9f9]">
         <div ref={stageRef} className="relative inline-block">
           <canvas
@@ -679,14 +679,14 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
           </div>
         )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/70 dark:text-slate-300">
         <div className="flex flex-wrap items-center gap-4 font-mono text-[11.5px]">
           <span title="Границы волн заданы генератором; это не автоматическое измерение клинической ЭКГ.">Интервалы модели:</span>
           <span>
-            <strong className="text-slate-800">ЧСС:</strong> {measurements.hr} уд/мин
+            <strong className="text-slate-800 dark:text-slate-100">ЧСС:</strong> {measurements.hr} уд/мин
           </span>
           <span>
-            <strong className="text-slate-800">PR:</strong>{' '}
+            <strong className="text-slate-800 dark:text-slate-100">PR:</strong>{' '}
             {options.aivr
               ? '— (РИА)'
               : options.rhythmDisorder === 'wenckebach'
@@ -696,14 +696,14 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
                   : `${measurements.prMs} мс`}
           </span>
           <span>
-            <strong className="text-slate-800">QRS:</strong> {measurements.qrsMs} мс
+            <strong className="text-slate-800 dark:text-slate-100">QRS:</strong> {measurements.qrsMs} мс
           </span>
           <span>
-            <strong className="text-slate-800">QT/QTc (Базетт):</strong> {measurements.qtMs}/
+            <strong className="text-slate-800 dark:text-slate-100">QT/QTc (Базетт):</strong> {measurements.qtMs}/
             {measurements.qtcMs} мс
           </span>
           {!options.aivr && options.rhythmDisorder === 'pvc' && (
-            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-bold text-amber-900">
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-bold text-amber-900 dark:bg-amber-950/70 dark:text-amber-200">
               + ЖЭС (PVC)
             </span>
           )}
@@ -711,7 +711,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
         </div>
 
         {!lockedClinicalSettings && <div className="no-print flex items-center gap-2">
-          <span className="text-[11px] font-semibold text-slate-500">ЧСС:</span>
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">ЧСС:</span>
           <input
             type="range"
             min={45}
@@ -721,7 +721,7 @@ const EcgPaperComponent: React.FC<EcgPaperProps> = ({
             onChange={(e) => onChangeHeartRate(Number(e.target.value))}
             className="h-1.5 w-28 cursor-pointer accent-red-700"
           />
-          <span className="w-12 font-mono text-[11px] font-bold text-slate-700">
+          <span className="w-12 font-mono text-[11px] font-bold text-slate-700 dark:text-slate-200">
             {heartRate}
           </span>
         </div>}

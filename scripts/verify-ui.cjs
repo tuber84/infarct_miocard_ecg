@@ -151,8 +151,39 @@ app.whenReady().then(async () => {
       return { scenarios: 'Переключения STEMI/ОКСбпST/Блокады, Rentrop, ориентиров, дополнительных отведений, доминирования, реперфузии, ручного ввода, сброса и режима КАГ выполнены', canvases: document.querySelectorAll('canvas').length };
     })()`);
     Object.assign(results, finalResults);
+    const initialTheme = await win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms = 180) => new Promise(resolve => setTimeout(resolve, ms));
+      const toggle = document.querySelector('button[aria-label="Переключить тему"]');
+      if (!toggle) throw new Error('Не найдена кнопка переключения темы');
+      const startedDark = document.documentElement.classList.contains('dark');
+      if (startedDark) {
+        toggle.click();
+        await wait(250);
+        if (document.documentElement.classList.contains('dark')) throw new Error('Не выключился класс dark');
+        if (localStorage.getItem('cardioatlas.theme.v1') !== 'light') throw new Error('Тема light не сохранена');
+      }
+      return { startedDark };
+    })()`);
     const screenshot = await win.webContents.capturePage();
     fs.writeFileSync(path.join(outputDir, 'interface.png'), screenshot.toPNG());
+    const themeCheck = await win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms = 180) => new Promise(resolve => setTimeout(resolve, ms));
+      const toggle = document.querySelector('button[aria-label="Переключить тему"]');
+      toggle.click();
+      await wait(250);
+      if (!document.documentElement.classList.contains('dark')) throw new Error('Не применился класс dark');
+      if (localStorage.getItem('cardioatlas.theme.v1') !== 'dark') throw new Error('Тема dark не сохранена');
+      return { startedDark: ${JSON.stringify(initialTheme.startedDark)}, toggledDark: true };
+    })()`);
+    results.darkThemeEnabled = themeCheck;
+    fs.writeFileSync(path.join(outputDir, 'interface-dark.png'), (await win.webContents.capturePage()).toPNG());
+    await win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms = 150) => new Promise(resolve => setTimeout(resolve, ms));
+      document.querySelector('button[aria-label="Переключить тему"]').click();
+      await wait();
+      if (document.documentElement.classList.contains('dark')) throw new Error('Не выключился класс dark');
+      if (localStorage.getItem('cardioatlas.theme.v1') !== 'light') throw new Error('Тема light не сохранена');
+    })()`);
     const scrollY = await win.webContents.executeJavaScript(`(async () => {
       const heading = [...document.querySelectorAll('p')].find(p => p.textContent === 'Основа: клинические рекомендации РФ, 2024');
       heading.scrollIntoView({ block: 'start', behavior: 'instant' });

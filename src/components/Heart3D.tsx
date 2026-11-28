@@ -69,6 +69,7 @@ interface Heart3DProps {
   timeline: number;
   reperfused: boolean;
   dominance: Dominance;
+  isDark?: boolean;
 }
 
 type ViewMode = 'anatomy' | 'angio';
@@ -1090,7 +1091,7 @@ function HeartSceneContent({
                         : 'border border-red-400 bg-red-950/95 text-amber-100'
                     : viewMode === 'angio'
                       ? 'border border-cyan-400/60 bg-slate-950/95 text-cyan-200'
-                      : 'border border-slate-300 bg-white/95 text-slate-800'
+                      : 'border border-slate-300 bg-white/95 text-slate-800 dark:border-slate-600 dark:bg-slate-900/95 dark:text-slate-100'
                 }`}
               />
             )}
@@ -1319,18 +1320,18 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
     : PROJECTION_COMPARE_TABLES.lca_caudal;
 
   return (
-    <div className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
       {/* Шапка 3D-окна */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 dark:border-slate-800">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px]">
+          <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] dark:border-slate-700 dark:bg-slate-800">
             <button
               type="button"
               onClick={() => handleSwitchMode('anatomy')}
               className={`rounded-md px-2.5 py-1 font-bold transition ${
                 viewMode === 'anatomy'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-slate-100'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
               }`}
             >
               Анатомия 3D
@@ -1340,8 +1341,8 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               onClick={() => handleSwitchMode('angio')}
               className={`flex items-center gap-1 rounded-md px-2.5 py-1 font-bold transition ${
                 viewMode === 'angio'
-                  ? 'bg-slate-900 text-sky-300 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-slate-900 text-sky-300 shadow-sm dark:bg-slate-950'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
               }`}
             >
               <Radiation className="h-3.5 w-3.5" />
@@ -1352,10 +1353,10 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
           <span
             className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
               activeLesionType === 'none' || props.reperfused
-                ? 'bg-emerald-50 text-emerald-700'
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
                 : activeLesionType === 'occlusion'
-                  ? 'bg-red-50 text-red-700'
-                  : 'bg-amber-50 text-amber-800'
+                  ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300'
+                  : 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
             }`}
           >
             {activeLesionType === 'none'
@@ -1373,7 +1374,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
         <div className="flex flex-wrap items-center gap-1 text-[11px]">
           {viewMode === 'angio' ? (
             <>
-              <div className="flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
+              <div className="flex rounded-md border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
                 {(['LCA', 'RCA', 'BOTH'] as AngioSystem[]).map((sys) => (
                   <button
                     key={sys}
@@ -1384,7 +1385,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                         ? sys === 'RCA'
                           ? 'bg-amber-600 text-white'
                           : 'bg-sky-600 text-white'
-                        : 'text-slate-600 hover:text-slate-900'
+                        : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                     }`}
                   >
                     {sys === 'LCA' ? 'ЛКА' : sys === 'RCA' ? 'ПКА' : 'Обе'}
@@ -1395,9 +1396,9 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                 type="button"
                 onClick={() => setBolusNonce((n) => n + 1)}
                 title="Анимация заполнения контрастом от устья до зоны окклюзии"
-                className="flex items-center gap-1 rounded-md bg-slate-900 px-2 py-1 font-semibold text-white hover:bg-slate-800"
+                className="flex items-center gap-1 rounded-md bg-slate-900 px-2 py-1 font-semibold text-white hover:bg-slate-800 dark:bg-sky-700 dark:hover:bg-sky-600"
               >
-                <Play className="h-3 w-3 text-sky-400" />
+                <Play className="h-3 w-3 text-sky-400 dark:text-white" />
                 Болюс
               </button>
               <button
@@ -1406,8 +1407,8 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                 title="Показать бледный контур сосуда дистальнее тромба"
                 className={`rounded-md border px-2 py-0.5 font-medium transition ${
                   showDistalGhost
-                    ? 'border-sky-400 bg-sky-50 text-sky-800'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    ? 'border-sky-400 bg-sky-50 text-sky-800 dark:border-sky-500/70 dark:bg-sky-950/60 dark:text-sky-200'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                 }`}
               >
                 Контур дист.
@@ -1418,8 +1419,8 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                 title="Показать/скрыть позвоночник, лёгкие и купол диафрагмы"
                 className={`rounded-md border px-2 py-0.5 font-medium transition ${
                   showFluoroLandmarks
-                    ? 'border-sky-400 bg-sky-50 text-sky-800'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    ? 'border-sky-400 bg-sky-50 text-sky-800 dark:border-sky-500/70 dark:bg-sky-950/60 dark:text-sky-200'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                 }`}
               >
                 Ориентиры
@@ -1431,8 +1432,8 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                   title={`${RENTROP_DESCRIPTIONS[rentropGrade].short}: ${RENTROP_DESCRIPTIONS[rentropGrade].detail}`}
                   className={`rounded-md border px-2 py-0.5 font-semibold transition ${
                     rentropGrade > 0
-                      ? 'border-amber-500 bg-amber-100 text-amber-900 shadow-sm'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                      ? 'border-amber-500 bg-amber-100 text-amber-900 shadow-sm dark:border-amber-600 dark:bg-amber-950/70 dark:text-amber-200'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                   }`}
                 >
                   {RENTROP_DESCRIPTIONS[rentropGrade].short}
@@ -1455,8 +1456,8 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               labelMode === 'all'
                 ? 'border-red-600 bg-red-600 text-white shadow-sm'
                 : labelMode === 'active'
-                  ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100/70'
-                  : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                  ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100/70 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300 dark:hover:bg-red-900/50'
+                  : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
             }`}
           >
             {labelMode === 'off' ? (
@@ -1477,8 +1478,8 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
             title="Показать / скрыть схему положения С-дуги"
             className={`flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium transition ${
               showCArmHud
-                ? 'border-sky-400 bg-sky-50 text-sky-800'
-                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                ? 'border-sky-400 bg-sky-50 text-sky-800 dark:border-sky-500/70 dark:bg-sky-950/60 dark:text-sky-200'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
             }`}
           >
             <Compass className="h-3 w-3" />
@@ -1487,7 +1488,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
         </div>
       </div>
 
-      <p className="px-3 py-2 text-xs text-slate-500">3D показывает поражённые сосуды; зоны миокарда — на схеме AHA.{props.dominance === 'left' ? ' Левый тип показан условно: форма сосудов фиксирована.' : ''}</p>
+      <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">3D показывает поражённые сосуды; зоны миокарда — на схеме AHA.{props.dominance === 'left' ? ' Левый тип показан условно: форма сосудов фиксирована.' : ''}</p>
       {/* 3D Canvas + Флюороскопический HUD */}
       <div
         ref={canvasContainerRef}
@@ -1495,13 +1496,13 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
         className={`relative h-[360px] flex-none overflow-hidden sm:h-[460px] ${
           viewMode === 'angio'
             ? 'bg-[#d2dae2]'
-            : 'bg-gradient-to-b from-slate-100 via-slate-50 to-slate-200'
+            : 'bg-gradient-to-b from-slate-100 via-slate-50 to-slate-200 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900'
         }`}
       >
         {!loaded && (
-          <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-slate-100/90">
+          <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-slate-100/90 dark:bg-slate-950/90">
             <div className="h-7 w-7 animate-spin rounded-full border-2 border-red-700 border-t-transparent" />
-            <span className="text-xs font-medium text-slate-600">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
               Загрузка 3D-модели сердца...
             </span>
           </div>
@@ -1523,7 +1524,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
             className={`rounded-lg border px-2.5 py-1.5 ${
               viewMode === 'angio'
                 ? 'border-slate-600/80 bg-slate-900/95 text-slate-100 shadow-lg'
-                : 'border-slate-200 bg-white/95 text-slate-800 shadow-sm'
+                : 'border-slate-200 bg-white/95 text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-100'
             }`}
           >
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider opacity-70">
@@ -1532,14 +1533,14 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
             </div>
             <div
               className={`font-mono text-sm font-extrabold tracking-tight ${
-                viewMode === 'angio' ? 'text-sky-300' : 'text-slate-900'
+                viewMode === 'angio' ? 'text-sky-300' : 'text-slate-900 dark:text-slate-100'
               }`}
             >
               {formattedLive.full}
             </div>
             <div className="text-[10.5px] font-semibold">
               {nearestProj ? (
-                <span className={viewMode === 'angio' ? 'text-emerald-300' : 'text-red-700'}>
+                <span className={viewMode === 'angio' ? 'text-emerald-300' : 'text-red-700 dark:text-red-400'}>
                   ≈ {nearestProj.title}
                 </span>
               ) : (
@@ -1563,7 +1564,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
           <div className="pointer-events-none absolute right-2.5 top-2.5 z-20 hidden sm:block">
             <CArmDiagram
               angles={liveAngles}
-              dark={viewMode === 'angio'}
+              dark={viewMode === 'angio' || Boolean(props.isDark)}
               compact
             />
           </div>
@@ -1595,7 +1596,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
           className={`pointer-events-none absolute bottom-2 left-2 z-20 rounded-md px-2 py-0.5 text-[10px] ${
             viewMode === 'angio'
               ? 'bg-slate-900/90 text-slate-200'
-              : 'bg-white/94 text-slate-600 shadow-sm'
+              : 'bg-white/94 text-slate-600 shadow-sm dark:bg-slate-900/90 dark:text-slate-300'
           }`}
         >
           <span className="hidden sm:inline">
@@ -1608,11 +1609,11 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
       </div>
 
       {/* Нижняя панель управления С-дугой, проекциями и справочником */}
-      <div className="space-y-2 border-t border-slate-100 bg-slate-50/90 p-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px]">
+      <div className="space-y-2 border-t border-slate-100 bg-slate-50/90 p-2.5 dark:border-slate-800 dark:bg-slate-900/70">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-1.5">
-              <span className="w-16 font-bold text-slate-600">RAO / LAO</span>
+              <span className="w-16 font-bold text-slate-600 dark:text-slate-300">RAO / LAO</span>
               <input
                 type="range"
                 min={-60}
@@ -1622,13 +1623,13 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                 onChange={(e) => handleSliderChange({ laoDeg: Number(e.target.value) })}
                 className="h-1.5 w-24 cursor-pointer accent-sky-600"
               />
-              <span className="w-14 font-mono font-bold text-slate-800">
+              <span className="w-14 font-mono font-bold text-slate-800 dark:text-slate-200">
                 {formattedLive.horiz.replace(' (задн.)', '')}
               </span>
             </label>
 
             <label className="flex items-center gap-1.5">
-              <span className="w-16 font-bold text-slate-600">CAU / CRA</span>
+              <span className="w-16 font-bold text-slate-600 dark:text-slate-300">CAU / CRA</span>
               <input
                 type="range"
                 min={-45}
@@ -1638,7 +1639,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                 onChange={(e) => handleSliderChange({ cranDeg: Number(e.target.value) })}
                 className="h-1.5 w-24 cursor-pointer accent-red-700"
               />
-              <span className="w-14 font-mono font-bold text-slate-800">
+              <span className="w-14 font-mono font-bold text-slate-800 dark:text-slate-200">
                 {formattedLive.vert}
               </span>
             </label>
@@ -1648,7 +1649,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
             <button
               type="button"
               onClick={() => selectProjection(PROJECTION_MAP.ap)}
-              className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10.5px] font-semibold text-slate-700 hover:bg-slate-100"
+              className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10.5px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               <RotateCcw className="h-3 w-3" />
               AP 0°
@@ -1658,7 +1659,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               type="button"
               onClick={() => setRecenterNonce((n) => n + 1)}
               title="Вернуть 3D-модель в центр окна (сохранив углы С-дуги)"
-              className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10.5px] font-semibold text-slate-700 hover:bg-slate-100"
+              className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10.5px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               <Crosshair className="h-3 w-3" />
               Центр
@@ -1677,8 +1678,8 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
 
         {/* Группы стандартных проекций (ЛКА и ПКА) */}
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-12">
-          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-sky-200/80 bg-sky-50/50 px-2 py-1.5 sm:col-span-8">
-            <span className="mr-1 text-[10px] font-extrabold uppercase tracking-wider text-sky-800">
+          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-sky-200/80 bg-sky-50/50 px-2 py-1.5 sm:col-span-8 dark:border-sky-900/60 dark:bg-sky-950/30">
+            <span className="mr-1 text-[10px] font-extrabold uppercase tracking-wider text-sky-800 dark:text-sky-300">
               ЛКА:
             </span>
             {lcaProjections.map((p) => {
@@ -1692,7 +1693,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                   className={`rounded-md px-2 py-0.5 text-[11px] font-semibold transition ${
                     active
                       ? 'bg-sky-700 text-white shadow-sm'
-                      : 'bg-white text-slate-700 ring-1 ring-sky-200 hover:bg-sky-100/70'
+                      : 'bg-white text-slate-700 ring-1 ring-sky-200 hover:bg-sky-100/70 dark:bg-slate-900 dark:text-slate-200 dark:ring-sky-800 dark:hover:bg-sky-900/50'
                   }`}
                 >
                   {p.shortLabel}
@@ -1701,8 +1702,8 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
             })}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50/50 px-2 py-1.5 sm:col-span-4">
-            <span className="mr-1 text-[10px] font-extrabold uppercase tracking-wider text-amber-800">
+          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50/50 px-2 py-1.5 sm:col-span-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+            <span className="mr-1 text-[10px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300">
               ПКА:
             </span>
             {rcaProjections.map((p) => {
@@ -1716,7 +1717,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                   className={`rounded-md px-2 py-0.5 text-[11px] font-semibold transition ${
                     active
                       ? 'bg-amber-600 text-white shadow-sm'
-                      : 'bg-white text-slate-700 ring-1 ring-amber-200 hover:bg-amber-100/70'
+                      : 'bg-white text-slate-700 ring-1 ring-amber-200 hover:bg-amber-100/70 dark:bg-slate-900 dark:text-slate-200 dark:ring-amber-800 dark:hover:bg-amber-900/50'
                   }`}
                 >
                   {p.shortLabel}
@@ -1727,14 +1728,14 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
         </div>
 
         {/* Сворачиваемый справочник активной проекции + сравнительная таблица */}
-        <div className="rounded-lg border border-slate-200 bg-white">
+        <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5">
             <button
               type="button"
               onClick={() => setShowGuideCard((v) => !v)}
-              className="flex items-center gap-1.5 text-left text-[11.5px] font-bold text-slate-800 hover:text-red-700"
+              className="flex items-center gap-1.5 text-left text-[11.5px] font-bold text-slate-800 hover:text-red-700 dark:text-slate-200 dark:hover:text-red-400"
             >
-              <BookOpen className="h-3.5 w-3.5 text-sky-600" />
+              <BookOpen className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
               <span>Справочник проекции: {activeProjInfo.title}</span>
               {showGuideCard ? (
                 <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
@@ -1751,8 +1752,8 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
               }}
               className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-semibold transition ${
                 showCompareTable
-                  ? 'border-sky-500 bg-sky-50 text-sky-800'
-                  : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  ? 'border-sky-500 bg-sky-50 text-sky-800 dark:border-sky-500/70 dark:bg-sky-950/60 dark:text-sky-200'
+                  : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
               }`}
             >
               <Table2 className="h-3 w-3" />
@@ -1761,29 +1762,29 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
           </div>
 
           {showGuideCard && (
-            <div className="space-y-2 border-t border-slate-100 px-3 py-2 text-xs">
-              <div className="text-[11px] text-slate-500">{activeProjInfo.fullNameRu}</div>
+            <div className="space-y-2 border-t border-slate-100 px-3 py-2 text-xs dark:border-slate-800">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">{activeProjInfo.fullNameRu}</div>
 
-              <div className="rounded-md border border-amber-200 bg-amber-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-amber-950">
+              <div className="rounded-md border border-amber-200 bg-amber-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
                 Шпаргалка: {activeProjInfo.cheatSheet}
               </div>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div>
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Что лучше всего видно
                   </div>
-                  <ul className="space-y-0.5 text-[11px] text-slate-700">
+                  <ul className="space-y-0.5 text-[11px] text-slate-700 dark:text-slate-300">
                     {activeProjInfo.whatIsVisible.map((line, i) => (
                       <li key={i}>• {line}</li>
                     ))}
                   </ul>
                 </div>
                 <div>
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Когда применять на столе
                   </div>
-                  <ul className="space-y-0.5 text-[11px] text-slate-700">
+                  <ul className="space-y-0.5 text-[11px] text-slate-700 dark:text-slate-300">
                     {activeProjInfo.uses.map((u, i) => (
                       <li key={i}>✓ {u}</li>
                     ))}
@@ -1791,22 +1792,22 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                 </div>
               </div>
 
-              <p className="text-[11px] leading-relaxed text-slate-600">
+              <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
                 {activeProjInfo.clinicalNote}
               </p>
 
               {showCompareTable && (
-                <div className="overflow-x-auto rounded-lg border border-slate-200 pt-1">
-                  <div className="bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-800">
+                <div className="overflow-x-auto rounded-lg border border-slate-200 pt-1 dark:border-slate-800">
+                  <div className="bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
                     {compareTable.title}{' '}
-                    <span className="font-normal text-slate-500">
+                    <span className="font-normal text-slate-500 dark:text-slate-400">
                       (кликните по заголовку столбца для поворота С-дуги)
                     </span>
                   </div>
                   <table className="w-full border-collapse text-left text-[11px]">
                     <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50">
-                        <th className="px-2 py-1 font-semibold text-slate-600">Сегмент / фокус</th>
+                      <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/60">
+                        <th className="px-2 py-1 font-semibold text-slate-600 dark:text-slate-300">Сегмент / фокус</th>
                         {compareTable.columns.map((col) => {
                           const isColActive = activeProjInfo.id === col.projectionId;
                           return (
@@ -1817,7 +1818,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                                 className={`rounded px-1.5 py-0.5 font-bold underline-offset-2 hover:underline ${
                                   isColActive
                                     ? 'bg-sky-700 text-white'
-                                    : 'text-sky-800 hover:bg-sky-100'
+                                    : 'text-sky-800 hover:bg-sky-100 dark:text-sky-300 dark:hover:bg-sky-900/50'
                                 }`}
                               >
                                 {col.label}
@@ -1829,7 +1830,7 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                     </thead>
                     <tbody>
                       {compareTable.rows.map((row, rIdx) => (
-                        <tr key={rIdx} className="border-b border-slate-100 last:border-none">
+                        <tr key={rIdx} className="border-b border-slate-100 last:border-none dark:border-slate-800">
                           {row.map((cell, cIdx) => {
                             const isBest =
                               cell.includes('Лучше всех') ||
@@ -1844,12 +1845,12 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
                                 key={cIdx}
                                 className={`px-2 py-1 ${
                                   cIdx === 0
-                                    ? 'font-semibold text-slate-700'
+                                    ? 'font-semibold text-slate-700 dark:text-slate-200'
                                     : isBest
-                                      ? 'font-bold text-emerald-700'
+                                      ? 'font-bold text-emerald-700 dark:text-emerald-400'
                                       : isWarn
-                                        ? 'text-amber-700'
-                                        : 'text-slate-600'
+                                        ? 'text-amber-700 dark:text-amber-400'
+                                        : 'text-slate-600 dark:text-slate-400'
                                 }`}
                               >
                                 {cell}

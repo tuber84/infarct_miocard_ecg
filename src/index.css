@@ -46,6 +46,14 @@
   background: #94a3b8;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
 /* Запрещаем системную лупу и выделение при работе с калипером на iOS */
 .ecg-paper canvas,
 .ecg-paper [data-ecg-viewport] {
@@ -68,6 +76,7 @@
 
   body {
     background: #ffffff !important;
+    color: #0f172a !important;
   }
 
   body * {
