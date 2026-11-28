@@ -19,6 +19,7 @@ const {
 } = require('../src/presentation/segmentedHeart.ts');
 const { getHeartSegmentGeometry } = require('../src/presentation/heartSegmentGeometry.ts');
 const { CASE_ORDER, CORONARY_CASES } = require('../src/core/content/coronaryCases.ts');
+const { createDiaphragmGeometry } = require('../src/presentation/diaphragm.ts');
 
 function getVertexKeySet(mesh) {
   const p = mesh.geometry.attributes.position;
@@ -99,12 +100,16 @@ function countConnectedComponents(mesh) {
   return comps;
 }
 
-test('Экспорт правого типа загружается, сохраняет Cd, нормали и все клинические маркеры на поверхности', async () => {
+async function loadModel(name) {
   const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-  const bytes = fs.readFileSync(path.join(__dirname, '../public/models/heart/heart_segmented.glb'));
-  const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+  const bytes = fs.readFileSync(path.join(__dirname, '../public/models/heart', name));
+  return (await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '')).scene;
+}
+
+test('Экспорт правого типа загружается, сохраняет Cd, нормали и все клинические маркеры на поверхности', async () => {
+  const scene = await loadModel('heart_segmented.glb');
   const meshes = {};
-  gltf.scene.traverse(n => { if (n.isMesh) meshes[n.name] = n; });
+  scene.traverse(n => { if (n.isMesh) meshes[n.name] = n; });
   assert.equal(Object.keys(meshes).length, 14);
   for (const name of ['heart_body', ...ARTERY_SEGMENTS]) {
     const m = meshes[name]; assert.ok(m, name);
@@ -132,11 +137,9 @@ test('Экспорт правого типа загружается, сохра�
 });
 
 test('Экспорт левого типа загружается, сохраняет Cd, нормали, стыки SYNTAX 13->14/15, изоляцию ПКА и маркеры', async () => {
-  const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-  const bytes = fs.readFileSync(path.join(__dirname, '../public/models/heart/heart_artery_left_type.glb'));
-  const gltf = await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+  const scene = await loadModel('heart_artery_left_type.glb');
   const meshes = {};
-  gltf.scene.traverse(n => { if (n.isMesh) meshes[n.name] = n; });
+  scene.traverse(n => { if (n.isMesh) meshes[n.name] = n; });
   assert.equal(Object.keys(meshes).length, 13);
   for (const name of ARTERY_SEGMENTS) {
     const m = meshes[name]; assert.ok(m, name);
@@ -170,7 +173,7 @@ test('Экспорт левого типа загружается, сохран�
   }
 });
 
-test('Поражения не затрагивают посторонний бассейн, доминирование переключает нижнее русло, а маркеры ЗМЖВ и ЗБВ разнесены', () => {
+test('Поражения не затрагивают посторонний бассейн, доминирование переключает нижнее русло', () => {
   assert.deepEqual(affectedArterySegments('normal','right'), []);
   for (const mimicId of ['lbbb_benign', 'pericarditis', 'early_repol', 'takotsubo']) {
     assert.deepEqual(affectedArterySegments(mimicId, 'right'), [], `${mimicId} не должен поражать артерии (right)`);
@@ -188,13 +191,49 @@ test('Поражения не затрагивают посторонний ба
   assert.ok(affectedArterySegments('nstemi_inf','left').includes('LCx'));
   assert.ok(!affectedArterySegments('nstemi_inf','left').includes('RCA_dist'));
   assert.ok(!affectedArterySegments('rca_prox','left').includes('PDA'));
-  for (const dom of ['right', 'left']) {
-    const lms = getHeartLandmarks(dom);
-    const pPda = lms.pda.localPos;
-    const pPlb = lms.posterior.localPos;
-    const dist = Math.hypot(pPda[0] - pPlb[0], pPda[1] - pPlb[1], pPda[2] - pPlb[2]);
-    assert.ok(dist > 0.1, `${dom}: маркеры ЗМЖВ и ЗБВ слишком близко (${dist.toFixed(4)})`);
+});
+
+test('Ориентиры КАГ и оба коронарных дерева совмещены в общем масштабе', async () => {
+  const { Box3, Vector3 } = await import('three');
+  const [right, left, lungs, spine] = await Promise.all(
+    ['heart_segmented.glb', 'heart_artery_left_type.glb', 'lungs.glb', 'spine.glb'].map(loadModel)
+  );
+  const heartBounds = new Box3().setFromObject(right);
+  const lungBounds = new Box3().setFromObject(lungs);
+  const spineBounds = new Box3().setFromObject(spine);
+  const heartSize = heartBounds.getSize(new Vector3());
+  const normScale = 3.15 / Math.max(heartSize.x, heartSize.y, heartSize.z);
+  assert.ok(lungBounds.min.y < heartBounds.min.y && lungBounds.max.y > heartBounds.max.y);
+  assert.ok(Math.abs(spineBounds.getCenter(new Vector3()).x - lungBounds.getCenter(new Vector3()).x) < heartSize.x * 0.1);
+  assert.ok(spineBounds.max.z < heartBounds.min.z, 'Позвоночник должен находиться позади сердца');
+  const markerPos = (scene, landmark) =>
+    scene.getObjectByName(landmark.mesh).localToWorld(new Vector3(...landmark.localPos));
+  const rightLm = getHeartLandmarks('right');
+  const leftLm = getHeartLandmarks('left');
+  for (const id of ['lad_prox', 'rca_prox']) {
+    const difference = markerPos(right, rightLm[id]).distanceTo(markerPos(left, leftLm[id])) * normScale;
+    assert.ok(difference < 0.2, `${id}: маркеры у проксимальных сегментов должны совпадать после переключения типа`);
   }
+  for (const [scene, landmarks] of [[right, rightLm], [left, leftLm]]) {
+    const distance = markerPos(scene, landmarks.pda).distanceTo(markerPos(scene, landmarks.posterior)) * normScale;
+    assert.ok(distance > 0.25, `Маркеры ЗМЖВ и ЗБВ слишком близко в сцене (${distance.toFixed(4)})`);
+  }
+});
+
+test('Купол диафрагмы прилегает к нижней поверхности сердца и охватывает основания лёгких', async () => {
+  const { Box3, Vector3 } = require('three');
+  const [heart, lungs] = await Promise.all(['heart_segmented.glb', 'lungs.glb'].map(loadModel));
+  const body = heart.getObjectByName('heart_body');
+  const lungBounds = new Box3().setFromObject(lungs, true);
+  const heartBounds = new Box3().setFromObject(body, true);
+  const dome = createDiaphragmGeometry(body, lungBounds);
+  dome.computeBoundingBox();
+  const bounds = dome.boundingBox;
+  assert.ok(Math.abs(bounds.max.y - heartBounds.min.y) < 1e-6, 'Вершина купола должна касаться сердца');
+  assert.ok(bounds.min.y < lungBounds.min.y);
+  assert.ok(Math.abs(bounds.getSize(new Vector3()).x - lungBounds.getSize(new Vector3()).x) < 1e-6);
+  assert.ok(Math.abs(bounds.getSize(new Vector3()).z - lungBounds.getSize(new Vector3()).z) < 1e-6);
+  dome.dispose();
 });
 
 test('Коллатерали Rentrop (ретроградный градиент и донорский бассейн) согласованы', () => {

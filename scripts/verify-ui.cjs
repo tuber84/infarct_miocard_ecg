@@ -146,6 +146,43 @@ app.whenReady().then(async () => {
       check(text().includes('Коллатерали: Rentrop 3'), 'Нет индикации коллатералей Rentrop 3 в HUD С-дуги');
       await wait(900);
       await click('Центр');
+      const guide = [...document.querySelectorAll('button')].find(button => button.innerText.startsWith('Справочник проекции'));
+      const timeline = slider;
+      check(guide && timeline, 'Нет справочника или шкалы времени');
+      document.querySelector('canvas').scrollIntoView({ block: 'center' });
+      await wait();
+      const timelineY = () => timeline.getBoundingClientRect().top + window.scrollY;
+      const checkProjection = async (label, title) => {
+        const y = timelineY();
+        const preset = [...document.querySelectorAll('button')].find(button =>
+          button.innerText.trim() === label && getComputedStyle(button).visibility === 'visible');
+        check(preset, 'Не найдена проекция ' + label);
+        preset.click();
+        for (let frame = 0; frame < 25; frame++) {
+          await wait(24);
+          check(Math.abs(timelineY() - y) < 1, 'Шкала времени сместилась при выборе ' + label);
+        }
+        check(guide.innerText.trim() === 'Справочник проекции: ' + title, 'Справочник не переключился на ' + title);
+      };
+      await checkProjection('AP Cran', 'AP Cranial');
+      await checkProjection('LAO Caud (Паук)', 'LAO Caudal («Паук» / Spider)');
+      await click('Сравнение проекций');
+      await checkProjection('LAO Cran (Crux)', 'LAO Cranial (ПКА / Crux)');
+      check([...document.querySelectorAll('table')].filter(table => getComputedStyle(table).visibility === 'visible').length === 1,
+        'В сравнении должна быть видна одна таблица');
+      await checkProjection('AP 0°', 'AP (Прямая)');
+      const positionBeforeDrag = timelineY();
+      const cranial = document.querySelector('input[type="range"][max="45"]');
+      check(cranial, 'Нет ползунка CAU / CRA');
+      const setRangeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      for (const value of [10, 25, 35, 10, -10, -25]) {
+        setRangeValue.call(cranial, String(value));
+        cranial.dispatchEvent(new Event('input', { bubbles: true }));
+        await wait(90);
+        check(Math.abs(timelineY() - positionBeforeDrag) < 1, 'Шкала времени сместилась при движении ползунка');
+      }
+      check(guide.innerText.trim() === 'Справочник проекции: AP Caudal', 'Справочник не обновился после движения ползунка');
+      await click('Сравнение проекций');
       return { scenarios: 'Переключения STEMI/ОКСбпST, коллатералей Rentrop, ориентиров и режима КАГ подготовлены', readyForAngioShot: true };
     })()`);
     fs.writeFileSync(path.join(outputDir, 'angio-fluoro.png'), (await win.webContents.capturePage()).toPNG());

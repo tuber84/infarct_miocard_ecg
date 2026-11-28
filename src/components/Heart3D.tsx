@@ -12,6 +12,7 @@ import {
 import { getHeartSegmentGeometry } from '../presentation/heartSegmentGeometry';
 import { getHeartLandmarks } from '../presentation/heartLandmarks';
 import { ARTERY_LABELS } from '../presentation/arteryLabels';
+import { createDiaphragmGeometry } from '../presentation/diaphragm';
 import React, {
   Component,
   Suspense,
@@ -398,14 +399,6 @@ function setupArteryMesh(mesh: THREE.Mesh, meshName: string, dominance: Dominanc
   return { dists, retroDists, inLcaFlags };
 }
 
-/**
- * Смещение оси позвоночника в сырых координатах (.tools/spine/spine.glb).
- * В файле позвоночник смоделирован с центром тел X ≈ 0.328, а сагиттальная плоскость лёгких — X = 0.019.
- * Дельта -0.309 совмещает позвоночный столб с сагиттальной плоскостью тела и лёгких (X = 0),
- * обеспечивая каноническую рентген-анатомическую проекцию: 2/3 тени сердца слева от позвоночника, 1/3 справа.
- */
-const SPINE_SAGITTAL_DELTA_X = -0.309;
-
 function computeLandmarksForDominance(
   dominance: Dominance,
   meshMap: Record<string, THREE.Mesh>
@@ -610,21 +603,24 @@ function HeartSceneContent({
 
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
         const normScale = 3.15 / maxDim;
+        const heartSurface = rightScene.getObjectByName('heart_body');
+        const lungBounds = lungsGltf?.scene ? new THREE.Box3().setFromObject(lungsGltf.scene) : null;
+        const fittedDiaphragm = heartSurface instanceof THREE.Mesh && lungBounds && !lungBounds.isEmpty()
+          ? createDiaphragmGeometry(heartSurface, lungBounds)
+          : null;
 
+        // Все части уже совмещены в GLB. Нормализуем группы, сохраняя преобразования внутри файлов.
         const wrapper = new THREE.Group();
-        for (const scenePart of [rightScene, leftScene]) {
-          scenePart.scale.multiplyScalar(normScale);
-          scenePart.position.set(
-            -center.x * normScale,
-            -center.y * normScale,
-            -center.z * normScale
-          );
-          wrapper.add(scenePart);
-        }
+        wrapper.scale.setScalar(normScale);
+        wrapper.position.copy(center).multiplyScalar(-normScale);
+        wrapper.add(rightScene, leftScene);
         wrapper.updateMatrixWorld(true);
 
-        // Настройка ориентиров флюороскопии (детальные анатомические позвоночник и лёгкие)
         const fluoro = new THREE.Group();
+        const thorax = new THREE.Group();
+        thorax.scale.copy(wrapper.scale);
+        thorax.position.copy(wrapper.position);
+        fluoro.add(thorax);
 
         if (spineGltf?.scene) {
           const spineScene = spineGltf.scene;
@@ -645,13 +641,7 @@ function HeartSceneContent({
             }
           });
 
-          spineScene.scale.setScalar(normScale);
-          spineScene.position.set(
-            (-center.x + SPINE_SAGITTAL_DELTA_X) * normScale,
-            -center.y * normScale,
-            -center.z * normScale
-          );
-          fluoro.add(spineScene);
+          thorax.add(spineScene);
         }
 
         if (lungsGltf?.scene) {
@@ -674,29 +664,25 @@ function HeartSceneContent({
             }
           });
 
-          lungsScene.scale.setScalar(normScale);
-          lungsScene.position.set(
-            -center.x * normScale,
-            -center.y * normScale,
-            -center.z * normScale
-          );
-          fluoro.add(lungsScene);
+          thorax.add(lungsScene);
         }
 
-        // Силуэт правого/центрального купола диафрагмы под нижней стенкой сердца и основанием лёгких
-        const diaphragmGeom = new THREE.SphereGeometry(2.5, 28, 12, 0, Math.PI * 2, 0, Math.PI * 0.36);
-        const diaphragmMat = new THREE.MeshBasicMaterial({
+        const diaphragmGeom = fittedDiaphragm ?? new THREE.SphereGeometry(2.5, 28, 12, 0, Math.PI * 2, 0, Math.PI * 0.36);
+        const diaphragmMesh = new THREE.Mesh(diaphragmGeom, new THREE.MeshBasicMaterial({
           color: '#64748b',
           transparent: true,
           opacity: 0.12,
           depthWrite: false,
           side: THREE.DoubleSide,
-        });
-        const diaphragmMesh = new THREE.Mesh(diaphragmGeom, diaphragmMat);
-        diaphragmMesh.position.set(-0.22, -2.28, -0.15);
-        diaphragmMesh.scale.set(1.05, 0.36, 0.85);
+        }));
+        if (fittedDiaphragm) {
+          thorax.add(diaphragmMesh);
+        } else {
+          diaphragmMesh.position.set(-0.22, -2.28, -0.15);
+          diaphragmMesh.scale.set(1.05, 0.36, 0.85);
+          fluoro.add(diaphragmMesh);
+        }
         diaphragmMesh.renderOrder = -1;
-        fluoro.add(diaphragmMesh);
 
         fluoro.updateMatrixWorld(true);
 
@@ -1230,6 +1216,178 @@ const HeartCanvasViewport: React.FC<HeartCanvasViewportProps> = React.memo(
   }
 );
 
+interface ProjectionGuideProps {
+  activeProjInfo: AngioProjection;
+  showGuideCard: boolean;
+  showCompareTable: boolean;
+  onToggleGuide: () => void;
+  onToggleComparison: () => void;
+  onSelectProjection: (projection: AngioProjection) => void;
+}
+
+const ProjectionGuide = React.memo(function ProjectionGuide({
+  activeProjInfo, showGuideCard, showCompareTable, onToggleGuide, onToggleComparison, onSelectProjection,
+}: ProjectionGuideProps) {
+  const compareTable = PROJECTION_COMPARE_TABLES[activeProjInfo.compareGroup ?? 'lca_caudal'];
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5">
+        <button
+          type="button"
+          onClick={onToggleGuide}
+          aria-expanded={showGuideCard}
+          className="flex items-center gap-1.5 text-left text-[11.5px] font-bold text-slate-800 hover:text-red-700 dark:text-slate-200 dark:hover:text-red-400"
+        >
+          <BookOpen className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+          <span className="grid min-w-0">
+            {ANGIO_PROJECTIONS.map(projection => (
+              <span key={projection.id} className={`col-start-1 row-start-1 ${projection === activeProjInfo ? '' : 'invisible'}`}>
+                Справочник проекции: {projection.title}
+              </span>
+            ))}
+          </span>
+          {showGuideCard ? (
+            <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+          )}
+        </button>
+
+        <button
+          type="button"
+          aria-pressed={showCompareTable}
+          onClick={onToggleComparison}
+          className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-semibold transition ${
+            showCompareTable
+              ? 'border-sky-500 bg-sky-50 text-sky-800 dark:border-sky-500/70 dark:bg-sky-950/60 dark:text-sky-200'
+              : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+          }`}
+        >
+          <Table2 className="h-3 w-3" />
+          Сравнение проекций
+        </button>
+      </div>
+
+      {showGuideCard && (
+        <div className="space-y-2 border-t border-slate-100 px-3 py-2 text-xs dark:border-slate-800">
+          {/* Все описания занимают одну ячейку. Высоту задаёт самое длинное при текущей ширине. */}
+          <div className="grid">
+            {ANGIO_PROJECTIONS.map(projection => (
+              <div key={projection.id} className={`col-start-1 row-start-1 min-w-0 space-y-2 ${projection === activeProjInfo ? '' : 'invisible'}`}>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">{projection.fullNameRu}</div>
+
+                <div className="rounded-md border border-amber-200 bg-amber-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+                  Шпаргалка: {projection.cheatSheet}
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Что лучше всего видно
+                    </div>
+                    <ul className="space-y-0.5 text-[11px] text-slate-700 dark:text-slate-300">
+                      {projection.whatIsVisible.map((line, i) => (
+                        <li key={i}>• {line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Когда применять на столе
+                    </div>
+                    <ul className="space-y-0.5 text-[11px] text-slate-700 dark:text-slate-300">
+                      {projection.uses.map((u, i) => (
+                        <li key={i}>✓ {u}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
+                  {projection.clinicalNote}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {showCompareTable && (
+            <div className="grid">
+              {Object.values(PROJECTION_COMPARE_TABLES).map(table => (
+                <div key={table.title} className={`col-start-1 row-start-1 min-w-0 overflow-x-auto rounded-lg border border-slate-200 pt-1 dark:border-slate-800 ${table === compareTable ? '' : 'invisible'}`}>
+                  <div className="bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+                    {table.title}{' '}
+                    <span className="font-normal text-slate-500 dark:text-slate-400">
+                      (кликните по заголовку столбца для поворота С-дуги)
+                    </span>
+                  </div>
+                  <table className="w-full border-collapse text-left text-[11px]">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/60">
+                        <th className="px-2 py-1 font-semibold text-slate-600 dark:text-slate-300">Сегмент / фокус</th>
+                        {table.columns.map((col) => {
+                          const isColActive = activeProjInfo.id === col.projectionId;
+                          return (
+                            <th key={col.projectionId} className="px-2 py-1">
+                              <button
+                                type="button"
+                                onClick={() => onSelectProjection(PROJECTION_MAP[col.projectionId])}
+                                className={`rounded px-1.5 py-0.5 font-bold underline-offset-2 hover:underline ${
+                                  isColActive
+                                    ? 'bg-sky-700 text-white'
+                                    : 'text-sky-800 hover:bg-sky-100 dark:text-sky-300 dark:hover:bg-sky-900/50'
+                                }`}
+                              >
+                                {col.label}
+                              </button>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {table.rows.map((row, rIdx) => (
+                        <tr key={rIdx} className="border-b border-slate-100 last:border-none dark:border-slate-800">
+                          {row.map((cell, cIdx) => {
+                            const isBest =
+                              cell.includes('Лучше всех') ||
+                              cell.includes('Отлично') ||
+                              cell.includes('Выбор №1');
+                            const isWarn =
+                              cell.includes('Укорочены') ||
+                              cell.includes('Наложение') ||
+                              cell.includes('Слабо');
+                            return (
+                              <td
+                                key={cIdx}
+                                className={`px-2 py-1 ${
+                                  cIdx === 0
+                                    ? 'font-semibold text-slate-700 dark:text-slate-200'
+                                    : isBest
+                                      ? 'font-bold text-emerald-700 dark:text-emerald-400'
+                                      : isWarn
+                                        ? 'text-amber-700 dark:text-amber-400'
+                                        : 'text-slate-600 dark:text-slate-400'
+                                }`}
+                              >
+                                {cell}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
 const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
   const exercise = props.exercise;
   const isExercise = Boolean(exercise);
@@ -1390,9 +1548,11 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
     });
   }, [angioSystem, donorSystem]);
 
-  const compareTable = activeProjInfo.compareGroup
-    ? PROJECTION_COMPARE_TABLES[activeProjInfo.compareGroup]
-    : PROJECTION_COMPARE_TABLES.lca_caudal;
+  const toggleGuide = useCallback(() => setShowGuideCard(visible => !visible), []);
+  const toggleComparison = useCallback(() => {
+    setShowGuideCard(true);
+    setShowCompareTable(visible => !visible);
+  }, []);
 
   return (
     <div className="flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900">
@@ -1804,145 +1964,16 @@ const Heart3DComponent: React.FC<Heart3DProps> = (props) => {
           </div>
         </div>
 
-        {/* Сворачиваемый справочник активной проекции + сравнительная таблица */}
-        {!exercise && <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5">
-            <button
-              type="button"
-              onClick={() => setShowGuideCard((v) => !v)}
-              className="flex items-center gap-1.5 text-left text-[11.5px] font-bold text-slate-800 hover:text-red-700 dark:text-slate-200 dark:hover:text-red-400"
-            >
-              <BookOpen className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
-              <span>Справочник проекции: {activeProjInfo.title}</span>
-              {showGuideCard ? (
-                <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setShowGuideCard(true);
-                setShowCompareTable((v) => !v);
-              }}
-              className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-semibold transition ${
-                showCompareTable
-                  ? 'border-sky-500 bg-sky-50 text-sky-800 dark:border-sky-500/70 dark:bg-sky-950/60 dark:text-sky-200'
-                  : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
-              }`}
-            >
-              <Table2 className="h-3 w-3" />
-              Сравнение проекций
-            </button>
-          </div>
-
-          {showGuideCard && (
-            <div className="space-y-2 border-t border-slate-100 px-3 py-2 text-xs dark:border-slate-800">
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">{activeProjInfo.fullNameRu}</div>
-
-              <div className="rounded-md border border-amber-200 bg-amber-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
-                Шпаргалка: {activeProjInfo.cheatSheet}
-              </div>
-
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div>
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Что лучше всего видно
-                  </div>
-                  <ul className="space-y-0.5 text-[11px] text-slate-700 dark:text-slate-300">
-                    {activeProjInfo.whatIsVisible.map((line, i) => (
-                      <li key={i}>• {line}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Когда применять на столе
-                  </div>
-                  <ul className="space-y-0.5 text-[11px] text-slate-700 dark:text-slate-300">
-                    {activeProjInfo.uses.map((u, i) => (
-                      <li key={i}>✓ {u}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
-                {activeProjInfo.clinicalNote}
-              </p>
-
-              {showCompareTable && (
-                <div className="overflow-x-auto rounded-lg border border-slate-200 pt-1 dark:border-slate-800">
-                  <div className="bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
-                    {compareTable.title}{' '}
-                    <span className="font-normal text-slate-500 dark:text-slate-400">
-                      (кликните по заголовку столбца для поворота С-дуги)
-                    </span>
-                  </div>
-                  <table className="w-full border-collapse text-left text-[11px]">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/60">
-                        <th className="px-2 py-1 font-semibold text-slate-600 dark:text-slate-300">Сегмент / фокус</th>
-                        {compareTable.columns.map((col) => {
-                          const isColActive = activeProjInfo.id === col.projectionId;
-                          return (
-                            <th key={col.projectionId} className="px-2 py-1">
-                              <button
-                                type="button"
-                                onClick={() => selectProjection(PROJECTION_MAP[col.projectionId])}
-                                className={`rounded px-1.5 py-0.5 font-bold underline-offset-2 hover:underline ${
-                                  isColActive
-                                    ? 'bg-sky-700 text-white'
-                                    : 'text-sky-800 hover:bg-sky-100 dark:text-sky-300 dark:hover:bg-sky-900/50'
-                                }`}
-                              >
-                                {col.label}
-                              </button>
-                            </th>
-                          );
-                        })}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {compareTable.rows.map((row, rIdx) => (
-                        <tr key={rIdx} className="border-b border-slate-100 last:border-none dark:border-slate-800">
-                          {row.map((cell, cIdx) => {
-                            const isBest =
-                              cell.includes('Лучше всех') ||
-                              cell.includes('Отлично') ||
-                              cell.includes('Выбор №1');
-                            const isWarn =
-                              cell.includes('Укорочены') ||
-                              cell.includes('Наложение') ||
-                              cell.includes('Слабо');
-                            return (
-                              <td
-                                key={cIdx}
-                                className={`px-2 py-1 ${
-                                  cIdx === 0
-                                    ? 'font-semibold text-slate-700 dark:text-slate-200'
-                                    : isBest
-                                      ? 'font-bold text-emerald-700 dark:text-emerald-400'
-                                      : isWarn
-                                        ? 'text-amber-700 dark:text-amber-400'
-                                        : 'text-slate-600 dark:text-slate-400'
-                                }`}
-                              >
-                                {cell}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </div>}
+        {!exercise && (
+          <ProjectionGuide
+            activeProjInfo={activeProjInfo}
+            showGuideCard={showGuideCard}
+            showCompareTable={showCompareTable}
+            onToggleGuide={toggleGuide}
+            onToggleComparison={toggleComparison}
+            onSelectProjection={selectProjection}
+          />
+        )}
       </div>
     </div>
   );
