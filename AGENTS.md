@@ -71,6 +71,7 @@
 | Добавить отведения / поменять сетку бумаги, печать, «Было/Стало» или калипер | `src/components/EcgPaper.tsx`, `src/utils/ecgPaperRender.ts`, `src/components/CabreraCircle.tsx`, `src/index.css`, `src/core/ecg/ecgEngine.ts` (`NORMAL_LEAD_BASE`, `computeFrontalVectors`) |
 | Изменить 3D-проекции КАГ, ПКМ-панорамирование, коллатерали Rentrop, ориентиры или подписи | `src/data/angiographyProjections.ts`, `src/utils/cArmMath.ts`, `src/components/CArmDiagram.tsx`, `src/components/Heart3D.tsx` (`ArteryLabel`, `FluoroscopyLandmarks`, `CameraRig`, `LabelMode`), `src/presentation/segmentedHeart.ts`, `src/presentation/arteryLabels.ts` |
 | Заменить 3D-модель сердца (напр., `.glb` из Houdini) | `public/models/heart/`, `src/components/Heart3D.tsx` (см. `docs/3D_MODEL.md`) |
+| Настроить светлую / тёмную тему интерфейса | `tailwind.config.js` (`darkMode: 'class'`), `index.html` (скрипт до рендера), `src/platform/theme.ts`, `src/App.tsx`, `src/index.css`, а также проп `isDark` в `Heart3D.tsx`, `AhaBullseye.tsx` и `CabreraCircle.tsx` |
 | Обновить сборку Windows `.exe` (Electron) | `electron/main.cjs`, `package.json` (`build`, `scripts`), `build/icon.ico` (см. `docs/DESKTOP_BUILD.md`) |
 
 ---
